@@ -4,10 +4,19 @@
 const $ = (sel, ctx = document) => ctx.querySelector(sel);
 const $$ = (sel, ctx = document) => Array.from(ctx.querySelectorAll(sel));
 
+function getCsrfToken() {
+  const match = document.cookie.match(/(?:^|;\s*)csrf-token=([^;]*)/);
+  return match ? decodeURIComponent(match[1]) : '';
+}
+
 async function api(path, opts = {}) {
+  const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
+  if (opts.method && opts.method !== 'GET') {
+    headers['X-CSRF-Token'] = getCsrfToken();
+  }
   const res = await fetch(`/api${path}`, {
     credentials: 'include',
-    headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
+    headers,
     ...opts,
   });
   const data = await res.json().catch(() => ({}));
@@ -16,7 +25,12 @@ async function api(path, opts = {}) {
 }
 
 async function apiFormData(path, formData, method = 'POST') {
-  const res = await fetch(`/api${path}`, { method, credentials: 'include', body: formData });
+  const res = await fetch(`/api${path}`, {
+    method,
+    credentials: 'include',
+    body: formData,
+    headers: { 'X-CSRF-Token': getCsrfToken() },
+  });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'Errore di rete.');
   return data;
@@ -69,7 +83,7 @@ function showAdminApp(user) {
 }
 function initLogout() {
   $('#logout-btn')?.addEventListener('click', async () => {
-    try { await api('/auth/logout', { method: 'POST' }); } catch (_) {}
+    try { await api('/auth/logout', { method: 'POST' }); } catch (_) { }
     showLoginScreen();
   });
 }
@@ -81,7 +95,7 @@ function switchView(viewName) {
   if (viewEl) viewEl.classList.add('active');
   const navBtn = $(`.sidebar-link[data-view="${viewName}"]`);
   if (navBtn) navBtn.classList.add('active');
-  const titles = { dashboard:'Dashboard', posts:'Articoli', 'new-post':'Nuovo articolo', comments:'Commenti', logs:'Log attività' };
+  const titles = { dashboard: 'Dashboard', posts: 'Articoli', 'new-post': 'Nuovo articolo', comments: 'Commenti', logs: 'Log attività' };
   const title = $('#admin-view-title');
   if (title) title.textContent = titles[viewName] || 'Admin';
   if (viewName === 'dashboard') loadDashboard();
@@ -103,10 +117,10 @@ async function loadDashboard() {
 function renderStatsCards(data) {
   const grid = $('#stats-grid'); if (!grid) return;
   const stats = [
-    { label: 'Visite totali', value: (data.site_visits_total||0).toLocaleString('it-IT'), sub: 'al sito' },
-    { label: 'Articoli', value: data.posts_published||0, sub: `${data.posts_draft||0} in bozza` },
-    { label: 'Like', value: data.total_likes||0, sub: 'su tutti gli articoli' },
-    { label: 'In attesa', value: data.comments_pending||0, sub: 'commenti da approvare' },
+    { label: 'Visite totali', value: (data.site_visits_total || 0).toLocaleString('it-IT'), sub: 'al sito' },
+    { label: 'Articoli', value: data.posts_published || 0, sub: `${data.posts_draft || 0} in bozza` },
+    { label: 'Like', value: data.total_likes || 0, sub: 'su tutti gli articoli' },
+    { label: 'In attesa', value: data.comments_pending || 0, sub: 'commenti da approvare' },
   ];
   grid.innerHTML = stats.map(s => `<div class="stat-card"><div class="stat-label">${s.label}</div><div class="stat-value">${s.value}</div><div class="stat-sub">${s.sub}</div></div>`).join('');
 }
@@ -123,7 +137,7 @@ function renderTopPosts(posts) {
 function renderRecentLogs(logs) {
   const container = $('#recent-logs-list'); if (!container) return;
   if (!logs.length) { container.innerHTML = '<p style="padding:1rem;color:var(--c-muted);font-size:0.85rem">Nessun log.</p>'; return; }
-  container.innerHTML = logs.slice(0,10).map(l => `<div class="log-item"><span class="log-action">${l.action}</span><span class="log-detail">${l.user_email||'—'}</span><span class="log-date">${formatDateTime(l.created_at)}</span></div>`).join('');
+  container.innerHTML = logs.slice(0, 10).map(l => `<div class="log-item"><span class="log-action">${l.action}</span><span class="log-detail">${l.user_email || '—'}</span><span class="log-date">${formatDateTime(l.created_at)}</span></div>`).join('');
 }
 
 async function loadAllPosts() {
@@ -136,10 +150,10 @@ async function loadAllPosts() {
       <tr>
         <td class="post-title-cell">${escapeHtml(p.title)}</td>
         <td><span class="badge">${p.type}</span></td>
-        <td><span class="badge ${p.status==='published'?'badge-published':'badge-draft'}">${p.status==='published'?'Pubblicato':'Bozza'}</span></td>
-        <td>${(p.visits||0).toLocaleString('it-IT')}</td>
-        <td>${p.likes||0}</td>
-        <td>${p.comments||0}${p.pending_comments?` <span class="badge badge-pending">${p.pending_comments}</span>`:''}</td>
+        <td><span class="badge ${p.status === 'published' ? 'badge-published' : 'badge-draft'}">${p.status === 'published' ? 'Pubblicato' : 'Bozza'}</span></td>
+        <td>${(p.visits || 0).toLocaleString('it-IT')}</td>
+        <td>${p.likes || 0}</td>
+        <td>${p.comments || 0}${p.pending_comments ? ` <span class="badge badge-pending">${p.pending_comments}</span>` : ''}</td>
         <td><div class="action-btns">
           <button class="btn btn-sm btn-ghost" onclick="editPost(${p.id})">Modifica</button>
           <button class="btn btn-sm btn-danger" onclick="deletePost(${p.id},'${escapeAttr(p.title)}')">Elimina</button>
@@ -167,13 +181,13 @@ async function editPost(postId) {
     const posts = (await api('/admin/posts')).posts;
     const post = posts.find(p => p.id === postId); if (!post) return;
     const { post: fullPost } = await api(`/posts/${post.slug}`);
-    $('#pe-title').value = fullPost.title||'';
-    $('#pe-type').value = fullPost.type||'articolo';
-    $('#pe-status').value = fullPost.status||'draft';
-    $('#pe-excerpt').value = fullPost.excerpt||'';
+    $('#pe-title').value = fullPost.title || '';
+    $('#pe-type').value = fullPost.type || 'articolo';
+    $('#pe-status').value = fullPost.status || 'draft';
+    $('#pe-excerpt').value = fullPost.excerpt || '';
     if (fullPost.cover_image) $('#cover-preview').innerHTML = `<img src="${fullPost.cover_image}" alt="Copertina" />`;
     if (!quillEditor) initQuill();
-    quillEditor.clipboard.dangerouslyPasteHTML(fullPost.content||'');
+    quillEditor.clipboard.dangerouslyPasteHTML(fullPost.content || '');
   } catch (err) { showStatus($('#post-editor-status'), err.message, 'error'); }
 }
 
@@ -181,16 +195,16 @@ function initQuill() {
   if (quillEditor) return;
   quillEditor = new Quill('#quill-editor', {
     theme: 'snow',
-    modules: { toolbar: [[{header:[2,3,false]}],['bold','italic','underline'],[{list:'ordered'},{list:'bullet'}],['blockquote','code-block'],['link','image'],['clean']] }
+    modules: { toolbar: [[{ header: [2, 3, false] }], ['bold', 'italic', 'underline'], [{ list: 'ordered' }, { list: 'bullet' }], ['blockquote', 'code-block'], ['link', 'image'], ['clean']] }
   });
 }
 
 function initCoverPreview() {
   const input = $('#pe-cover'), preview = $('#cover-preview');
-  if (!input||!preview) return;
+  if (!input || !preview) return;
   input.addEventListener('change', () => {
     const file = input.files[0];
-    if (!file) { preview.innerHTML=''; return; }
+    if (!file) { preview.innerHTML = ''; return; }
     preview.innerHTML = `<img src="${URL.createObjectURL(file)}" alt="Anteprima" />`;
   });
 }
@@ -212,7 +226,7 @@ function initPostEditorForm() {
     try {
       if (editingPostId) await apiFormData(`/posts/${editingPostId}`, formData, 'PUT');
       else await apiFormData('/posts', formData, 'POST');
-      showStatus(status, `Articolo ${editingPostId?'aggiornato':'creato'} con successo.`, 'success');
+      showStatus(status, `Articolo ${editingPostId ? 'aggiornato' : 'creato'} con successo.`, 'success');
       setTimeout(() => switchView('posts'), 1500);
     } catch (err) { showStatus(status, err.message, 'error'); }
     finally { btn.disabled = false; btn.textContent = 'Salva articolo'; }
@@ -222,7 +236,7 @@ function initPostEditorForm() {
 async function deletePost(postId, title) {
   if (!confirm(`Elimina l'articolo "${title}"? Irreversibile.`)) return;
   try { await api(`/posts/${postId}`, { method: 'DELETE' }); loadAllPosts(); }
-  catch (err) { alert('Errore: '+err.message); }
+  catch (err) { alert('Errore: ' + err.message); }
 }
 
 async function loadComments() {
@@ -230,13 +244,13 @@ async function loadComments() {
   container.innerHTML = '<p style="padding:1.25rem;color:var(--c-muted)">Caricamento…</p>';
   try {
     const { comments } = await api('/admin/comments');
-    allCommentsData = comments||[]; renderComments();
+    allCommentsData = comments || []; renderComments();
   } catch (err) { container.innerHTML = `<p style="padding:1rem;color:var(--c-error)">${err.message}</p>`; }
 }
 
 function renderComments() {
   const container = $('#comments-list'); if (!container) return;
-  const toShow = commentsFilter==='pending' ? allCommentsData.filter(c=>!c.is_approved) : allCommentsData;
+  const toShow = commentsFilter === 'pending' ? allCommentsData.filter(c => !c.is_approved) : allCommentsData;
   if (!toShow.length) { container.innerHTML = '<p style="padding:1.25rem;color:var(--c-muted);font-style:italic">Nessun commento.</p>'; return; }
   container.innerHTML = toShow.map(c => `
     <div class="comment-admin-item">
@@ -244,31 +258,31 @@ function renderComments() {
         <div class="comment-admin-meta">
           <span class="comment-admin-author">${escapeHtml(c.author_name)}</span>
           <span class="comment-admin-post">su: ${escapeHtml(c.post_title)}</span>
-          ${!c.is_approved?'<span class="badge badge-pending">In attesa</span>':'<span class="badge badge-published">Approvato</span>'}
+          ${!c.is_approved ? '<span class="badge badge-pending">In attesa</span>' : '<span class="badge badge-published">Approvato</span>'}
         </div>
         <span class="comment-admin-date">${formatDateTime(c.created_at)}</span>
       </div>
       <p class="comment-admin-content">${escapeHtml(c.content)}</p>
       <div class="comment-admin-actions" style="margin-top:0.5rem">
-        ${!c.is_approved?`<button class="btn btn-sm btn-ghost" onclick="approveComment(${c.id})">Approva</button>`:''}
+        ${!c.is_approved ? `<button class="btn btn-sm btn-ghost" onclick="approveComment(${c.id})">Approva</button>` : ''}
         <button class="btn btn-sm btn-danger" onclick="deleteComment(${c.id})">Elimina</button>
       </div>
     </div>`).join('');
 }
 
 async function approveComment(id) {
-  try { await api(`/comments/${id}/approve`, {method:'PATCH'}); const c=allCommentsData.find(x=>x.id===id); if(c) c.is_approved=1; renderComments(); }
+  try { await api(`/comments/${id}/approve`, { method: 'PATCH' }); const c = allCommentsData.find(x => x.id === id); if (c) c.is_approved = 1; renderComments(); }
   catch (err) { alert(err.message); }
 }
 async function deleteComment(id) {
   if (!confirm('Eliminare questo commento?')) return;
-  try { await api(`/comments/${id}`, {method:'DELETE'}); allCommentsData=allCommentsData.filter(c=>c.id!==id); renderComments(); }
+  try { await api(`/comments/${id}`, { method: 'DELETE' }); allCommentsData = allCommentsData.filter(c => c.id !== id); renderComments(); }
   catch (err) { alert(err.message); }
 }
 function initCommentFilters() {
   document.addEventListener('click', e => {
     const ftab = e.target.closest('.ftab'); if (!ftab) return;
-    $$('.ftab').forEach(t=>t.classList.remove('active')); ftab.classList.add('active');
+    $$('.ftab').forEach(t => t.classList.remove('active')); ftab.classList.add('active');
     commentsFilter = ftab.dataset.filter; renderComments();
   });
 }
@@ -277,26 +291,25 @@ async function loadLogs() {
   const tbody = $('#logs-tbody'); if (!tbody) return;
   tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--c-muted)">Caricamento…</td></tr>';
   try {
-    const data = await api('/admin/stats');
-    const logs = data.recent_logs||[];
+    const data = await api('/admin/logs');
+    const logs = data.logs || [];
     tbody.innerHTML = logs.map(l => `
       <tr>
         <td>${formatDateTime(l.created_at)}</td>
         <td><code style="font-size:.75rem;color:var(--c-accent)">${l.action}</code></td>
-        <td>${l.entity_type||'—'} ${l.entity_id?`#${l.entity_id}`:''}</td>
-        <td style="font-family:monospace;font-size:.75rem;color:var(--c-muted)">${l.ip_address||'—'}</td>
-        <td style="font-size:.75rem;color:var(--c-muted)">${l.details?JSON.stringify(l.details).substring(0,60):'—'}</td>
+        <td>${l.entity_type || '—'} ${l.entity_id ? `#${l.entity_id}` : ''}</td>
+        <td style="font-family:monospace;font-size:.75rem;color:var(--c-muted)">${l.ip_address || '—'}</td>
+        <td style="font-size:.75rem;color:var(--c-muted)">${l.details ? JSON.stringify(l.details).substring(0, 60) : '—'}</td>
       </tr>`).join('');
-  } catch (err) { tbody.innerHTML=`<tr><td colspan="5" style="color:var(--c-error);padding:1rem">${err.message}</td></tr>`; }
+  } catch (err) { tbody.innerHTML = `<tr><td colspan="5" style="color:var(--c-error);padding:1rem">${err.message}</td></tr>`; }
 }
 
 function escapeHtml(str) {
   if (!str) return '';
-  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 function escapeAttr(str) { return escapeHtml(str); }
 
-// Globali per onclick inline
 window.editPost = editPost;
 window.deletePost = deletePost;
 window.approveComment = approveComment;

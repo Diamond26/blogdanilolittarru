@@ -42,13 +42,22 @@ function pluralize(n, singular, plural) {
   return `${n} ${n === 1 ? singular : plural}`;
 }
 
+function getCsrfToken() {
+  const match = document.cookie.match(/(?:^|;\s*)csrf-token=([^;]*)/);
+  return match ? decodeURIComponent(match[1]) : '';
+}
+
 // ═══════════════════════════════
 // API
 // ═══════════════════════════════
 async function api(path, options = {}) {
+  const headers = { 'Content-Type': 'application/json', ...options.headers };
+  if (options.method && options.method !== 'GET') {
+    headers['X-CSRF-Token'] = getCsrfToken();
+  }
   const res = await fetch(`/api${path}`, {
     credentials: 'include',
-    headers: { 'Content-Type': 'application/json', ...options.headers },
+    headers,
     ...options,
   });
   const data = await res.json().catch(() => ({}));
@@ -79,7 +88,6 @@ function initMenu() {
     btn.classList.toggle('open', open);
     btn.setAttribute('aria-expanded', String(open));
   });
-  // Close on nav link click
   $$('.nav-link', nav).forEach(link => {
     link.addEventListener('click', () => {
       nav.classList.remove('open');
@@ -153,7 +161,6 @@ function renderPostCard(post) {
     onkeydown: (e) => { if (e.key === 'Enter') openPost(post.slug); },
   });
 
-  // Image
   const imgWrap = el('div', { class: 'post-card-image' });
   if (post.cover_image) {
     const img = el('img', { src: post.cover_image, alt: post.title, loading: 'lazy' });
@@ -163,7 +170,6 @@ function renderPostCard(post) {
     imgWrap.appendChild(ph);
   }
 
-  // Body
   const body = el('div', { class: 'post-card-body' });
   body.appendChild(el('span', { class: 'post-card-type' }, post.type === 'intervista' ? 'Intervista' : 'Articolo'));
   body.appendChild(el('h3', { class: 'post-card-title' }, post.title));
@@ -239,7 +245,6 @@ function initPostOverlay() {
 function renderPostDetail(post, comments, container) {
   const frag = document.createDocumentFragment();
 
-  // Header
   frag.appendChild(el('div', { class: 'post-detail-type' }, post.type === 'intervista' ? 'Intervista' : 'Articolo'));
   const title = el('h1', { id: 'post-overlay-title', class: 'post-detail-title' }, post.title);
   frag.appendChild(title);
@@ -249,7 +254,6 @@ function renderPostDetail(post, comments, container) {
   meta.appendChild(el('span', {}, `${post.visit_count || 0} letture`));
   frag.appendChild(meta);
 
-  // Cover image
   if (post.cover_image) {
     frag.appendChild(el('img', {
       class: 'post-detail-cover',
@@ -258,11 +262,9 @@ function renderPostDetail(post, comments, container) {
     }));
   }
 
-  // Content
   const contentDiv = el('div', { class: 'post-detail-content prose', html: post.content });
   frag.appendChild(contentDiv);
 
-  // Like
   const likeSection = el('div', { class: 'post-like-section' });
   const likeBtn = el('button', { class: 'like-btn', 'data-postid': post.id });
   likeBtn.innerHTML = '<span class="like-icon">♡</span> Mi piace';
@@ -271,10 +273,8 @@ function renderPostDetail(post, comments, container) {
   likeSection.appendChild(likeCountText);
   frag.appendChild(likeSection);
 
-  // Init like
   initLikeBtn(likeBtn, post.id, likeCountText);
 
-  // Comments section
   const commentsSection = el('div', { class: 'post-comments-section' });
   const approvedComments = comments || [];
   const topLevel = approvedComments.filter(c => !c.parent_id);
@@ -286,7 +286,6 @@ function renderPostDetail(post, comments, container) {
     commentsSection.appendChild(renderComment(comment, approvedComments, post.id));
   });
 
-  // Comment form
   commentsSection.appendChild(renderCommentForm(post.id));
   frag.appendChild(commentsSection);
 
@@ -302,20 +301,21 @@ function renderComment(comment, allComments, postId) {
   wrap.appendChild(header);
   wrap.appendChild(el('p', { class: 'comment-content' }, comment.content));
 
-  const replyBtn = el('button', { class: 'comment-reply-btn', onclick: () => {
-    state.replyToId = comment.id;
-    const form = $('#comment-form-inner');
-    if (form) {
-      const label = form.querySelector('.reply-indicator');
-      if (label) label.textContent = `Rispondendo a ${comment.author_name}`;
-      form.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      form.querySelector('input[name="author_name"]')?.focus();
+  const replyBtn = el('button', {
+    class: 'comment-reply-btn', onclick: () => {
+      state.replyToId = comment.id;
+      const form = $('#comment-form-inner');
+      if (form) {
+        const label = form.querySelector('.reply-indicator');
+        if (label) label.textContent = `Rispondendo a ${comment.author_name}`;
+        form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        form.querySelector('input[name="author_name"]')?.focus();
+      }
     }
-  }});
+  });
   replyBtn.textContent = 'Rispondi';
   wrap.appendChild(replyBtn);
 
-  // Replies
   const replies = allComments.filter(c => c.parent_id === comment.id);
   replies.forEach(reply => {
     const replyWrap = el('div', { class: 'comment comment-reply' });
@@ -413,13 +413,13 @@ async function initLikeBtn(btn, postId, countEl) {
   try {
     const { liked, count } = await api(`/likes/${postId}/status`);
     updateLikeBtn(btn, liked, count, countEl);
-  } catch (_) {}
+  } catch (_) { }
 
   btn.addEventListener('click', async () => {
     try {
       const { liked, count } = await api(`/likes/${postId}`, { method: 'POST' });
       updateLikeBtn(btn, liked, count, countEl);
-    } catch (_) {}
+    } catch (_) { }
   });
 }
 
@@ -453,8 +453,6 @@ function initContactForm() {
       showFormStatus(statusEl, 'Accetta la privacy policy per continuare.', 'error');
       return;
     }
-    // In produzione: invia a un endpoint o servizio email (Resend, SendGrid, ecc.)
-    // Qui simuliamo una risposta positiva
     submitBtn.disabled = true;
     submitBtn.textContent = 'Invio in corso…';
     await new Promise(r => setTimeout(r, 1000));
@@ -479,14 +477,6 @@ function showFormStatus(el, msg, type) {
 function initFooterYear() {
   const el = $('#footer-year');
   if (el) el.textContent = new Date().getFullYear();
-}
-
-// ═══════════════════════════════
-// TRACK SITE VISIT
-// ═══════════════════════════════
-async function trackSiteVisit() {
-  try { await fetch('/api/admin/noop', { credentials: 'include' }).catch(() => {}); } catch (_) {}
-  // La visita viene tracciata automaticamente nel middleware Express
 }
 
 // ═══════════════════════════════

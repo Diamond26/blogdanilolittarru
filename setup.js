@@ -1,14 +1,4 @@
 #!/usr/bin/env node
-/**
- * setup.js — Script iniziale per creare l'utente admin
- * 
- * Utilizzo:
- *   node setup.js
- * 
- * Richiede le variabili d'ambiente nel file .env
- */
-
-// Carica .env manualmente (senza dipendenza da dotenv)
 const fs = require('fs');
 const path = require('path');
 const envPath = path.join(__dirname, '.env');
@@ -29,7 +19,7 @@ if (fs.existsSync(envPath)) {
 }
 
 const bcrypt = require('bcryptjs');
-const { query, queryOne } = require('./utils/db');
+const { callProc, callProcOne } = require('./utils/db');
 
 async function setup() {
   const email = process.env.ADMIN_EMAIL;
@@ -49,16 +39,13 @@ async function setup() {
   const hash = await bcrypt.hash(password, 12);
 
   console.log('⏳ Verifica esistenza admin...');
-  const existing = await queryOne('SELECT id FROM users WHERE email = ?', [email]);
+  const existing = await callProcOne('sp_find_user_by_email', [email]);
 
   if (existing) {
-    await query('UPDATE users SET password = ? WHERE email = ?', [hash, email]);
+    await callProc('sp_update_admin_password', [email, hash]);
     console.log(`✅ Password aggiornata per admin: ${email}`);
   } else {
-    await query(
-      'INSERT INTO users (email, password, role) VALUES (?, ?, ?)',
-      [email, hash, 'admin']
-    );
+    await callProc('sp_create_admin', [email, hash]);
     console.log(`✅ Admin creato: ${email}`);
   }
 

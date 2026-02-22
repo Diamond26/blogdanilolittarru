@@ -1,4 +1,3 @@
-// routes/posts.js - CRUD articoli e interviste
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
@@ -6,11 +5,10 @@ const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 const { body, param, query: qValidator, validationResult } = require('express-validator');
-const { query, queryOne } = require('../utils/db');
+const { callProc, callProcOne } = require('../utils/db');
 const { requireAdmin, optionalAuth } = require('../middleware/auth');
 const { sanitizeHTML, sanitizeText, generateSlug } = require('../middleware/security');
 
-// Upload immagini
 const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 
@@ -24,7 +22,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (_, file, cb) => {
     const allowed = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
     const ext = path.extname(file.originalname).toLowerCase();
@@ -35,9 +33,7 @@ const upload = multer({
   },
 });
 
-// ──────────────────────────────────────────
-// GET /api/posts - Lista post pubblicati
-// ──────────────────────────────────────────
+// GET /api/posts — Lista post pubblicati
 router.get('/', optionalAuth, [
   qValidator('page').optional().isInt({ min: 1 }).toInt(),
   qValidator('limit').optional().isInt({ min: 1, max: 50 }).toInt(),
@@ -46,37 +42,14 @@ router.get('/', optionalAuth, [
   const { page = 1, limit = 10, type } = req.query;
   const offset = (page - 1) * limit;
   const isAdmin = !!req.user;
+  const publishedOnly = isAdmin ? 0 : 1;
 
   try {
-    const statusFilter = isAdmin ? '' : "AND p.status = 'published'";
-    const typeFilter = type ? 'AND p.type = ?' : '';
-    const params = [limit, offset];
-    if (type) params.splice(0, 0, type);
+    const countResult = await callProc('sp_get_posts_count', [type || null, publishedOnly]);
+    const totalRow = Array.isArray(countResult[0]) ? countResult[0][0] : countResult[0];
 
-    const countParams = type ? [type] : [];
-    const countTypeFilter = type ? 'AND type = ?' : '';
-    const statusCountFilter = isAdmin ? '' : "AND status = 'published'";
-
-    const [totalRow] = await query(
-      `SELECT COUNT(*) AS total FROM posts WHERE 1=1 ${statusCountFilter} ${countTypeFilter}`,
-      countParams
-    );
-
-    const sqlParams = type ? [type, limit, offset] : [limit, offset];
-    const posts = await query(
-      `SELECT p.id, p.uuid, p.type, p.title, p.slug, p.excerpt,
-              p.cover_image, p.status, p.published_at, p.created_at,
-              u.email AS author_email,
-              (SELECT COUNT(*) FROM likes l WHERE l.post_id = p.id) AS like_count,
-              (SELECT COALESCE(SUM(pv.count),0) FROM post_visits pv WHERE pv.post_id = p.id) AS visit_count,
-              (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id AND c.is_approved = 1) AS comment_count
-       FROM posts p
-       JOIN users u ON p.author_id = u.id
-       WHERE 1=1 ${statusFilter} ${typeFilter}
-       ORDER BY p.published_at DESC, p.created_at DESC
-       LIMIT ? OFFSET ?`,
-      sqlParams
-    );
+    const postsResult = await callProc('sp_get_posts_list', [type || null, publishedOnly, limit, offset]);
+    const posts = Array.isArray(postsResult[0]) ? postsResult[0] : postsResult;
 
     return res.json({
       posts,
@@ -93,44 +66,21 @@ router.get('/', optionalAuth, [
   }
 });
 
-// ──────────────────────────────────────────
-// GET /api/posts/:slug - Singolo post
-// ──────────────────────────────────────────
+// GET /api/posts/:slug — Singolo post
 router.get('/:slug', optionalAuth, async (req, res) => {
   const { slug } = req.params;
   const isAdmin = !!req.user;
+  const publishedOnly = isAdmin ? 0 : 1;
 
   try {
-    const statusFilter = isAdmin ? '' : "AND p.status = 'published'";
-    const post = await queryOne(
-      `SELECT p.*, u.email AS author_email,
-              (SELECT COUNT(*) FROM likes l WHERE l.post_id = p.id) AS like_count,
-              (SELECT COALESCE(SUM(pv.count),0) FROM post_visits pv WHERE pv.post_id = p.id) AS visit_count
-       FROM posts p
-       JOIN users u ON p.author_id = u.id
-       WHERE p.slug = ? ${statusFilter}`,
-      [slug]
-    );
-
+    const post = await callProcOne('sp_get_post_by_slug', [slug, publishedOnly]);
     if (!post) return res.status(404).json({ error: 'Articolo non trovato.' });
 
-    // Conta visita
     const today = new Date().toISOString().slice(0, 10);
-    await query(
-      `INSERT INTO post_visits (post_id, visit_date, count)
-       VALUES (?, ?, 1)
-       ON DUPLICATE KEY UPDATE count = count + 1`,
-      [post.id, today]
-    );
+    await callProc('sp_increment_post_visits', [post.id, today]);
 
-    // Commenti approvati con risposte
-    const comments = await query(
-      `SELECT id, parent_id, author_name, content, created_at
-       FROM comments
-       WHERE post_id = ? AND is_approved = 1
-       ORDER BY created_at ASC`,
-      [post.id]
-    );
+    const commentsResult = await callProc('sp_get_approved_comments', [post.id]);
+    const comments = Array.isArray(commentsResult[0]) ? commentsResult[0] : commentsResult;
 
     return res.json({ post, comments });
   } catch (err) {
@@ -139,9 +89,7 @@ router.get('/:slug', optionalAuth, async (req, res) => {
   }
 });
 
-// ──────────────────────────────────────────
-// POST /api/posts - Crea articolo (admin)
-// ──────────────────────────────────────────
+// POST /api/posts — Crea articolo (admin)
 router.post('/', requireAdmin,
   upload.single('cover_image'),
   [
@@ -163,26 +111,26 @@ router.post('/', requireAdmin,
     const coverImage = req.file ? `/uploads/${req.file.filename}` : null;
 
     let slug = generateSlug(cleanTitle);
-    // Slug univocità
-    const existing = await queryOne('SELECT id FROM posts WHERE slug = ?', [slug]);
+    const existing = await callProcOne('sp_check_slug_exists', [slug, null]);
     if (existing) slug = `${slug}-${Date.now()}`;
 
     const id_uuid = uuidv4();
     const publishedAt = status === 'published' ? new Date() : null;
 
     try {
-      const result = await query(
-        `INSERT INTO posts (uuid, author_id, type, title, slug, excerpt, content, cover_image, status, published_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [id_uuid, req.user.id, type, cleanTitle, slug, cleanExcerpt, cleanContent, coverImage, status, publishedAt]
-      );
+      const createResult = await callProc('sp_create_post', [
+        id_uuid, req.user.id, type, cleanTitle, slug, cleanExcerpt,
+        cleanContent, coverImage, status, publishedAt
+      ]);
+      const insertRow = Array.isArray(createResult[0]) ? createResult[0][0] : createResult[0];
+      const insertId = insertRow.insertId;
 
-      await query(
-        'INSERT INTO admin_logs (user_id, action, entity_type, entity_id, ip_address, details) VALUES (?, ?, ?, ?, ?, ?)',
-        [req.user.id, 'POST_CREATED', 'post', result.insertId, req.ip, JSON.stringify({ title: cleanTitle })]
-      );
+      await callProc('sp_insert_admin_log', [
+        req.user.id, 'POST_CREATED', 'post', insertId, req.ip,
+        JSON.stringify({ title: cleanTitle })
+      ]);
 
-      const newPost = await queryOne('SELECT * FROM posts WHERE id = ?', [result.insertId]);
+      const newPost = await callProcOne('sp_get_post_by_id', [insertId]);
       return res.status(201).json({ post: newPost });
     } catch (err) {
       console.error('POST /posts error:', err);
@@ -191,9 +139,7 @@ router.post('/', requireAdmin,
   }
 );
 
-// ──────────────────────────────────────────
-// PUT /api/posts/:id - Modifica articolo (admin)
-// ──────────────────────────────────────────
+// PUT /api/posts/:id — Modifica articolo (admin)
 router.put('/:id', requireAdmin,
   upload.single('cover_image'),
   [
@@ -204,7 +150,7 @@ router.put('/:id', requireAdmin,
   ],
   async (req, res) => {
     const { id } = req.params;
-    const existing = await queryOne('SELECT * FROM posts WHERE id = ?', [id]);
+    const existing = await callProcOne('sp_get_post_by_id', [id]);
     if (!existing) return res.status(404).json({ error: 'Articolo non trovato.' });
 
     const { title, content, excerpt, type, status } = req.body;
@@ -221,24 +167,21 @@ router.put('/:id', requireAdmin,
     let slug = existing.slug;
     if (title && sanitizeText(title) !== existing.title) {
       slug = generateSlug(cleanTitle);
-      const slugCheck = await queryOne('SELECT id FROM posts WHERE slug = ? AND id != ?', [slug, id]);
+      const slugCheck = await callProcOne('sp_check_slug_exists', [slug, parseInt(id)]);
       if (slugCheck) slug = `${slug}-${Date.now()}`;
     }
 
     try {
-      await query(
-        `UPDATE posts SET title=?, slug=?, excerpt=?, content=?, cover_image=?,
-         type=?, status=?, published_at=?, updated_at=NOW()
-         WHERE id=?`,
-        [cleanTitle, slug, cleanExcerpt, cleanContent, coverImage, newType, newStatus, publishedAt, id]
-      );
+      await callProc('sp_update_post', [
+        id, cleanTitle, slug, cleanExcerpt, cleanContent,
+        coverImage, newType, newStatus, publishedAt
+      ]);
 
-      await query(
-        'INSERT INTO admin_logs (user_id, action, entity_type, entity_id, ip_address) VALUES (?, ?, ?, ?, ?)',
-        [req.user.id, 'POST_UPDATED', 'post', id, req.ip]
-      );
+      await callProc('sp_insert_admin_log', [
+        req.user.id, 'POST_UPDATED', 'post', parseInt(id), req.ip, null
+      ]);
 
-      const updated = await queryOne('SELECT * FROM posts WHERE id = ?', [id]);
+      const updated = await callProcOne('sp_get_post_by_id', [id]);
       return res.json({ post: updated });
     } catch (err) {
       console.error('PUT /posts/:id error:', err);
@@ -247,20 +190,18 @@ router.put('/:id', requireAdmin,
   }
 );
 
-// ──────────────────────────────────────────
-// DELETE /api/posts/:id - Elimina articolo (admin)
-// ──────────────────────────────────────────
+// DELETE /api/posts/:id — Elimina articolo (admin)
 router.delete('/:id', requireAdmin, async (req, res) => {
   const { id } = req.params;
-  const post = await queryOne('SELECT * FROM posts WHERE id = ?', [id]);
+  const post = await callProcOne('sp_get_post_by_id', [id]);
   if (!post) return res.status(404).json({ error: 'Articolo non trovato.' });
 
   try {
-    await query('DELETE FROM posts WHERE id = ?', [id]);
-    await query(
-      'INSERT INTO admin_logs (user_id, action, entity_type, entity_id, ip_address, details) VALUES (?, ?, ?, ?, ?, ?)',
-      [req.user.id, 'POST_DELETED', 'post', id, req.ip, JSON.stringify({ title: post.title })]
-    );
+    await callProc('sp_delete_post', [id]);
+    await callProc('sp_insert_admin_log', [
+      req.user.id, 'POST_DELETED', 'post', parseInt(id), req.ip,
+      JSON.stringify({ title: post.title })
+    ]);
     return res.json({ ok: true, message: 'Articolo eliminato.' });
   } catch (err) {
     console.error('DELETE /posts/:id error:', err);
@@ -268,9 +209,7 @@ router.delete('/:id', requireAdmin, async (req, res) => {
   }
 });
 
-// ──────────────────────────────────────────
-// POST /api/posts/:id/image - Upload immagine standalone
-// ──────────────────────────────────────────
+// POST /api/posts/:id/image — Upload immagine standalone
 router.post('/:id/image', requireAdmin, upload.single('image'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'Nessun file caricato.' });
   const url = `/uploads/${req.file.filename}`;

@@ -1,7 +1,5 @@
-// api/index.js - Entry point Express / Vercel serverless
 'use strict';
 
-// Carica .env in sviluppo locale (senza dipendenza da dotenv)
 if (process.env.NODE_ENV !== 'production') {
   try {
     const fs = require('fs'), path = require('path');
@@ -17,15 +15,16 @@ if (process.env.NODE_ENV !== 'production') {
         if (k && !process.env[k]) process.env[k] = v;
       });
     }
-  } catch (_) {}
+  } catch (_) { }
 }
 
-const express    = require('express');
-const helmet     = require('helmet');
-const cors       = require('cors');
+const express = require('express');
+const helmet = require('helmet');
+const cors = require('cors');
 const cookieParser = require('cookie-parser');
-const path       = require('path');
-const { query }  = require('../utils/db');
+const crypto = require('crypto');
+const path = require('path');
+const { callProc } = require('../utils/db');
 
 const app = express();
 
@@ -35,14 +34,16 @@ const app = express();
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
-      defaultSrc:  ["'self'"],
-      scriptSrc:   ["'self'", "'unsafe-inline'", 'cdnjs.cloudflare.com'],
-      styleSrc:    ["'self'", "'unsafe-inline'", 'fonts.googleapis.com', 'cdnjs.cloudflare.com'],
-      fontSrc:     ["'self'", 'fonts.gstatic.com', 'fonts.googleapis.com'],
-      imgSrc:      ["'self'", 'data:', 'blob:'],
-      connectSrc:  ["'self'"],
-      frameSrc:    ["'none'"],
-      objectSrc:   ["'none'"],
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", 'cdnjs.cloudflare.com'],
+      styleSrc: ["'self'", "'unsafe-inline'", 'fonts.googleapis.com', 'cdnjs.cloudflare.com'],
+      fontSrc: ["'self'", 'fonts.gstatic.com', 'fonts.googleapis.com'],
+      imgSrc: ["'self'", 'data:', 'blob:'],
+      connectSrc: ["'self'"],
+      frameSrc: ["'none'"],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+      formAction: ["'self'"],
     },
   },
   referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
@@ -67,7 +68,7 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
 }));
 
 // ═══════════════════════════════════════
@@ -78,18 +79,41 @@ app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 app.use(cookieParser());
 
 // ═══════════════════════════════════════
-// CONTATORE VISITE SITO
+// CSRF PROTECTION (Double Submit Cookie)
+// ═══════════════════════════════════════
+app.use((req, res, next) => {
+  if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') {
+    if (!req.cookies['csrf-token']) {
+      const token = crypto.randomUUID();
+      res.cookie('csrf-token', token, {
+        httpOnly: false,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        path: '/',
+      });
+    }
+    return next();
+  }
+
+  if (req.path.startsWith('/api')) {
+    const cookieToken = req.cookies['csrf-token'];
+    const headerToken = req.headers['x-csrf-token'];
+    if (!cookieToken || !headerToken || cookieToken !== headerToken) {
+      return res.status(403).json({ error: 'Token CSRF non valido.' });
+    }
+  }
+  next();
+});
+
+// ═══════════════════════════════════════
+// CONTATORE VISITE SITO (stored procedure)
 // ═══════════════════════════════════════
 app.use(async (req, res, next) => {
   if (req.method === 'GET' && !req.path.startsWith('/api')) {
     try {
       const today = new Date().toISOString().slice(0, 10);
-      await query(
-        `INSERT INTO site_visits (visit_date, count) VALUES (?, 1)
-         ON DUPLICATE KEY UPDATE count = count + 1`,
-        [today]
-      );
-    } catch (_) { /* silenzio: non bloccare la request */ }
+      await callProc('sp_increment_site_visits', [today]);
+    } catch (_) { }
   }
   next();
 });
@@ -104,16 +128,16 @@ app.use(express.static(publicDir));
 // ═══════════════════════════════════════
 // API ROUTES
 // ═══════════════════════════════════════
-app.use('/api/auth',     require('../routes/auth'));
-app.use('/api/posts',    require('../routes/posts'));
+app.use('/api/auth', require('../routes/auth'));
+app.use('/api/posts', require('../routes/posts'));
 app.use('/api/comments', require('../routes/comments'));
-app.use('/api/likes',    require('../routes/likes'));
-app.use('/api/admin',    require('../routes/admin'));
+app.use('/api/likes', require('../routes/likes'));
+app.use('/api/admin', require('../routes/admin'));
 
 // ═══════════════════════════════════════
 // SPA FALLBACK (Admin nascosto)
 // ═══════════════════════════════════════
-app.get('/gestione-privata', (req, res) => {
+app.get('/admin', (req, res) => {
   res.setHeader('X-Robots-Tag', 'noindex, nofollow');
   res.setHeader('Cache-Control', 'no-store');
   res.sendFile(path.join(publicDir, 'admin.html'));
@@ -141,7 +165,7 @@ if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
   const PORT = process.env.PORT || 3000;
   app.listen(PORT, () => {
     console.log(`\n🧠 Danilo Littarru — Server avviato su http://localhost:${PORT}`);
-    console.log(`📋 Admin dashboard: http://localhost:${PORT}/gestione-privata\n`);
+    console.log(`📋 Admin dashboard: http://localhost:${PORT}/admin\n`);
   });
 }
 
