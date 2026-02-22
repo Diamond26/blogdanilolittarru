@@ -95,13 +95,14 @@ function switchView(viewName) {
   if (viewEl) viewEl.classList.add('active');
   const navBtn = $(`.sidebar-link[data-view="${viewName}"]`);
   if (navBtn) navBtn.classList.add('active');
-  const titles = { dashboard: 'Dashboard', posts: 'Articoli', 'new-post': 'Nuovo articolo', comments: 'Commenti', logs: 'Log attività' };
+  const titles = { dashboard: 'Dashboard', posts: 'Articoli', 'new-post': 'Nuovo articolo', comments: 'Commenti', contacts: 'Messaggi', logs: 'Log attività' };
   const title = $('#admin-view-title');
   if (title) title.textContent = titles[viewName] || 'Admin';
   if (viewName === 'dashboard') loadDashboard();
   else if (viewName === 'posts') loadAllPosts();
   else if (viewName === 'new-post') initNewPost();
   else if (viewName === 'comments') loadComments();
+  else if (viewName === 'contacts') loadContacts();
   else if (viewName === 'logs') loadLogs();
 }
 function initNavigation() {
@@ -287,6 +288,43 @@ function initCommentFilters() {
   });
 }
 
+async function loadContacts() {
+  const container = $('#contacts-list'); if (!container) return;
+  container.innerHTML = '<p style="padding:1.25rem;color:var(--c-muted)">Caricamento…</p>';
+  try {
+    const { contacts } = await api('/contacts');
+    if (!contacts || !contacts.length) { container.innerHTML = '<p style="padding:1.25rem;color:var(--c-muted);font-style:italic">Nessun messaggio ricevuto.</p>'; return; }
+    container.innerHTML = contacts.map(c => `
+      <div class="comment-admin-item contact-admin-item ${!c.is_read ? 'unread' : ''}">
+        <div class="comment-admin-header">
+          <div class="comment-admin-meta">
+            <span class="comment-admin-author">${escapeHtml(c.name)}</span>
+            <span class="comment-admin-post">Tel: ${escapeHtml(c.phone)}</span>
+            ${c.subject ? `<span class="badge">${escapeHtml(c.subject)}</span>` : ''}
+            ${!c.is_read ? '<span class="badge badge-pending">Nuovo</span>' : ''}
+          </div>
+          <span class="comment-admin-date">${formatDateTime(c.created_at)}</span>
+        </div>
+        <p class="comment-admin-content" style="white-space:pre-wrap">${escapeHtml(c.message)}</p>
+        <div class="comment-admin-actions" style="margin-top:0.5rem">
+          ${!c.is_read ? `<button class="btn btn-sm btn-ghost" onclick="markContactRead(${c.id})">Letto</button>` : ''}
+          <button class="btn btn-sm btn-danger" onclick="deleteContact(${c.id})">Elimina</button>
+        </div>
+      </div>`).join('');
+  } catch (err) { container.innerHTML = `<p style="padding:1rem;color:var(--c-error)">${err.message}</p>`; }
+}
+
+async function markContactRead(id) {
+  try { await api(`/contacts/${id}/read`, { method: 'PATCH' }); loadContacts(); }
+  catch (err) { alert(err.message); }
+}
+
+async function deleteContact(id) {
+  if (!confirm('Eliminare questo messaggio?')) return;
+  try { await api(`/contacts/${id}`, { method: 'DELETE' }); loadContacts(); }
+  catch (err) { alert(err.message); }
+}
+
 async function loadLogs() {
   const tbody = $('#logs-tbody'); if (!tbody) return;
   tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--c-muted)">Caricamento…</td></tr>';
@@ -314,6 +352,8 @@ window.editPost = editPost;
 window.deletePost = deletePost;
 window.approveComment = approveComment;
 window.deleteComment = deleteComment;
+window.markContactRead = markContactRead;
+window.deleteContact = deleteContact;
 window.switchView = switchView;
 
 document.addEventListener('DOMContentLoaded', () => {

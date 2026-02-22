@@ -38,9 +38,9 @@ app.use(helmet({
       scriptSrc: ["'self'", "'unsafe-inline'", 'cdnjs.cloudflare.com'],
       styleSrc: ["'self'", "'unsafe-inline'", 'fonts.googleapis.com', 'cdnjs.cloudflare.com'],
       fontSrc: ["'self'", 'fonts.gstatic.com', 'fonts.googleapis.com'],
-      imgSrc: ["'self'", 'data:', 'blob:'],
+      imgSrc: ["'self'", 'data:', 'blob:', 'https://img.youtube.com', 'https://i.ytimg.com'],
       connectSrc: ["'self'"],
-      frameSrc: ["'none'"],
+      frameSrc: ["'self'", 'https://www.youtube.com', 'https://www.youtube-nocookie.com'],
       objectSrc: ["'none'"],
       baseUri: ["'self'"],
       formAction: ["'self'"],
@@ -132,6 +132,7 @@ app.use('/api/auth', require('../routes/auth'));
 app.use('/api/posts', require('../routes/posts'));
 app.use('/api/comments', require('../routes/comments'));
 app.use('/api/likes', require('../routes/likes'));
+app.use('/api/contacts', require('../routes/contacts'));
 app.use('/api/admin', require('../routes/admin'));
 
 // ═══════════════════════════════════════

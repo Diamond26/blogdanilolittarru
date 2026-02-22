@@ -10,9 +10,11 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link
-    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&display=swap"
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Sans+3:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap"
     rel="stylesheet" />
-  <link rel="stylesheet" href="/css/main.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+    crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <link rel="stylesheet" href="/css/main.css?v=4" />
 </head>
 
 <body>
@@ -21,14 +23,14 @@
   <header class="header" id="site-header">
     <div class="container header-inner">
       <a href="#" class="header-logo">
-        <span class="logo-mark">DL</span>
-        <span class="logo-text">Danilo Littarru</span>
+        <img src="/img/logo.png" alt="Danilo Littarru Signature" class="header-logo-img">
       </a>
       <nav class="nav" id="main-nav">
         <a href="#chi-sono" class="nav-link">Chi sono</a>
         <a href="#competenze" class="nav-link">Competenze</a>
         <a href="#servizi" class="nav-link">Servizi</a>
-        <a href="#articoli" class="nav-link">Articoli</a>
+        <a href="#articoli" class="nav-link" data-tab="articolo">Articoli</a>
+        <a href="#articoli" class="nav-link" data-tab="intervista">Interviste</a>
         <a href="#contatti" class="nav-link nav-link--cta">Contattami</a>
       </nav>
       <button class="menu-toggle" id="menu-toggle" aria-label="Apri menu" aria-expanded="false">
@@ -42,8 +44,8 @@
     <div class="container hero-content">
       <p class="hero-overline">Psicologo · Psicoterapeuta</p>
       <h1 class="hero-title">Danilo<br />Littarru</h1>
-      <p class="hero-subtitle">Ti accompagno in un percorso di comprensione e crescita personale, con professionalità e
-        ascolto autentico.</p>
+      <p class="hero-subtitle">Ti accompagno in un percorso personalizzato di supporto psicologico ed educativo, fondato
+        su competenza clinica, esperienza nel mondo scolastico ed empatia autentica.</p>
       <div class="hero-actions">
         <a href="#contatti" class="btn btn--primary">Prenota un colloquio</a>
         <a href="#chi-sono" class="btn btn--outline">Scopri di più</a>
@@ -51,80 +53,145 @@
     </div>
   </section>
 
-  <!-- ═══ CHI SONO ═══ -->
   <section class="section" id="chi-sono">
     <div class="container">
-      <div class="section-label">Chi sono</div>
-      <h2 class="section-title">Il mio approccio</h2>
-      <div class="about-content">
-        <div class="prose">
-          <p>Sono uno psicologo e psicoterapeuta con esperienza nel supporto a persone che attraversano momenti di
-            difficoltà emotiva, relazionale e esistenziale.</p>
-          <p>Il mio lavoro si fonda sull'ascolto attivo, sulla costruzione di una relazione terapeutica sicura e
-            sull'utilizzo di strumenti clinici validati, adattati alle esigenze specifiche di ogni persona.</p>
-          <p>Credo che ogni individuo abbia le risorse per affrontare le proprie sfide — il mio ruolo è aiutarti a
-            ritrovarle e rafforzarle.</p>
+      <div class="about-grid">
+        <div class="about-image-wrapper">
+          <img src="/img/danilo.png" alt="Dr. Danilo Littarru" class="about-photo">
         </div>
-        <div class="qualifiche">
-          <div class="qualifica">
-            <span class="qualifica-year">2019</span>
-            <span class="qualifica-text">Laurea Magistrale in Psicologia Clinica</span>
+        <div class="about-details">
+          <div class="section-label">Profilo</div>
+          <h2 class="section-title">Chi sono</h2>
+          <div class="prose">
+            <h3 style="margin-bottom: 0.5rem; color: var(--c-accent);">Dr. Danilo Littarru</h3>
+            <p class="lead"
+              style="font-size: var(--fs-md); font-weight: 500; color: var(--c-text); margin-bottom: 2rem;">
+              Psicologo Clinico e della Riabilitazione, Pedagogista ad indirizzo psico-educativo, esperto dell’età
+              evolutiva e dei Disturbi Specifici dell’Apprendimento (DSA), con particolare attenzione a bullismo e
+              cyberbullismo.
+            </p>
+
+            <p>Sono iscritto all’Ordine degli Psicologi della Sardegna (n. 3946) e all’Associazione Nazionale
+              Pedagogisti
+              Italiani (ANPE). Da oltre venticinque anni insegno in scuole statali e di formazione superiore,
+              affiancando
+              all’attività didattica un costante impegno clinico e riabilitativo.</p>
+
+            <p>La mia formazione comprende la laurea in Psicologia, la specializzazione in Psicologia Clinica e
+              Riabilitativa, con competenze nella valutazione, diagnosi e trattamento di disabilità cognitive,
+              emozionali
+              e psichiche. Ho conseguito la laurea con 110/110 e lode e due Master in “Handicap e Integrazione” presso
+              l’Università Europea di Roma (70/70), oltre a un Master in Psicologia dell’infanzia e dell’adolescenza con
+              titolo di eccellenza accademica. Ho inoltre approfondito studi in Naturopatia Infantile e Nutracetica.</p>
+
+            <p>Mi sono specializzato nell’accompagnamento di bambini in età prescolare e scolare, adolescenti e adulti,
+              with particolare attenzione alle neurodivergenze: DSA, ADHD, Disturbo dello Spettro Autistico (ASD),
+              disturbi
+              del linguaggio e altre differenze neurologiche. Lavoro anche con le famiglie, intervenendo sulle dinamiche
+              relazionali che possono influire sul benessere del bambino o dell’adolescente.</p>
+
+            <p>Il mio approccio è integrato e personalizzato: unisco interventi psico-riabilitativi, supporto
+              psico-educativo e tecniche di rilassamento — in particolare il training autogeno — per promuovere il
+              benessere emotivo e sociale. Empatia e ascolto attivo sono alla base del mio agire professionale, con
+              l’obiettivo di costruire percorsi realmente su misura.</p>
+
+            <p>Collaboro con scuole, servizi sociali ed educatori per progettare interventi individualizzati e
+              promuovere
+              un’educazione inclusiva. Sono inoltre giornalista e divulgatore in ambito psico-pedagogico, curando
+              rubriche
+              su testate dedicate a psicologia ed educazione. Sono preparatore mentale certificato dalla Federazione
+              Italiana Tennis e Padel.</p>
+
+            <p>Metto a disposizione la mia esperienza per chi desidera affrontare in modo concreto e personalizzato
+              difficoltà psicologiche, educative e relazionali, promuovendo integrazione, valorizzazione delle
+              differenze
+              e un ambiente familiare più sereno.</p>
           </div>
-          <div class="qualifica">
-            <span class="qualifica-year">2020</span>
-            <span class="qualifica-text">Iscrizione all'Albo degli Psicologi</span>
-          </div>
-          <div class="qualifica">
-            <span class="qualifica-year">2023</span>
-            <span class="qualifica-text">Specializzazione in Psicoterapia</span>
+
+          <div class="qualifiche">
+            <div class="qualifica">
+              <span class="qualifica-year">2006</span>
+              <span class="qualifica-text">Laurea in Psicologia Clinica e di Comunità</span>
+            </div>
+            <div class="qualifica">
+              <span class="qualifica-year">2011</span>
+              <span class="qualifica-text">Specializzazione in Psicoterapia</span>
+            </div>
+            <div class="qualifica">
+              <span class="qualifica-year">OGGI</span>
+              <span class="qualifica-text">Psicologo Scolastico e Libero Professionista</span>
+            </div>
           </div>
         </div>
       </div>
     </div>
   </section>
 
+
+  <!-- ═══ ARTICOLI ═══ -->
+  <section class="section section--alt" id="articoli">
+    <div class="container">
+      <div class="section-header">
+        <div>
+          <div class="section-label">Blog</div>
+          <h2 class="section-title">Articoli e approfondimenti</h2>
+        </div>
+        <div class="filter-tabs">
+          <button class="filter-tab active" data-type="articolo">Articoli</button>
+          <button class="filter-tab" data-type="intervista">Interviste</button>
+        </div>
+      </div>
+      <div class="posts-grid" id="posts-grid"></div>
+      <div class="posts-loading" id="posts-loading">
+        <div class="loading-spinner"></div>
+      </div>
+      <p class="empty-state hidden" id="empty-state">Nessun articolo disponibile al momento.</p>
+      <div class="pagination" id="pagination"></div>
+    </div>
+  </section>
+
   <!-- ═══ COMPETENZE ═══ -->
-  <section class="section section--alt" id="competenze">
+  <section class="section" id="competenze">
     <div class="container">
       <div class="section-label">Competenze</div>
       <h2 class="section-title">Aree di intervento</h2>
       <div class="skills-grid">
         <div class="skill-card">
-          <div class="skill-icon">🧠</div>
-          <h3>Ansia e stress</h3>
-          <p>Strumenti concreti per gestire ansia, attacchi di panico e situazioni di forte stress emotivo.</p>
+          <h3>Disturbi Specifici dell’Apprendimento (DSA)</h3>
+          <p>Valutazione e supporto per difficoltà di lettura, scrittura e calcolo. Interventi personalizzati per
+            favorire autonomia, metodo di studio e inclusione scolastica.</p>
         </div>
         <div class="skill-card">
-          <div class="skill-icon">💬</div>
-          <h3>Relazioni</h3>
-          <p>Supporto per difficoltà nelle relazioni interpersonali, di coppia e familiari.</p>
+          <h3>ADHD e Disturbi dell’Attenzione</h3>
+          <p>Percorsi mirati per migliorare concentrazione, autoregolazione, gestione dell’impulsività e organizzazione
+            delle attività scolastiche e quotidiane.</p>
         </div>
         <div class="skill-card">
-          <div class="skill-icon">🌱</div>
-          <h3>Crescita personale</h3>
-          <p>Percorsi di consapevolezza e sviluppo delle proprie risorse interiori.</p>
+          <h3>Disturbo dello Spettro Autistico (ASD) e Neurodivergenze</h3>
+          <p>Interventi psico-educativi individualizzati per sostenere lo sviluppo delle competenze sociali,
+            comunicative e relazionali, in collaborazione con famiglia e scuola.</p>
         </div>
         <div class="skill-card">
-          <div class="skill-icon">🔄</div>
-          <h3>Cambiamenti di vita</h3>
-          <p>Accompagnamento nei momenti di transizione, lutto, separazione o crisi esistenziale.</p>
+          <h3>Ansia, Regolazione Emotiva e Rabbia</h3>
+          <p>Strumenti concreti per aiutare bambini e adolescenti a riconoscere e gestire ansia, paure, rabbia e
+            difficoltà emotive, rafforzando autostima e sicurezza personale.</p>
         </div>
         <div class="skill-card">
-          <div class="skill-icon">😔</div>
-          <h3>Umore e depressione</h3>
-          <p>Intervento sugli stati depressivi, apatia e perdita di motivazione.</p>
+          <h3>Difficoltà Comportamentali (DOP, DC)</h3>
+          <p>Intervento su comportamenti oppositivi, provocatori o aggressivi, lavorando sulle cause profonde del
+            disagio e costruendo strategie educative condivise con la famiglia.</p>
         </div>
         <div class="skill-card">
-          <div class="skill-icon">🎯</div>
-          <h3>Autostima</h3>
-          <p>Lavoro sull'immagine di sé, insicurezze e costruzione di una maggiore fiducia personale.</p>
+          <h3>Supporto Genitoriale</h3>
+          <p>Accompagnamento ai genitori nella comprensione delle dinamiche evolutive, nella gestione delle difficoltà
+            quotidiane e nella costruzione di un ambiente familiare sereno e coerente.</p>
         </div>
       </div>
     </div>
   </section>
 
   <!-- ═══ SERVIZI ═══ -->
-  <section class="section" id="servizi">
+  <section class="section section--alt" id="servizi">
     <div class="container">
       <div class="section-label">Servizi</div>
       <h2 class="section-title">Come posso aiutarti</h2>
@@ -163,35 +230,16 @@
     </div>
   </section>
 
-  <!-- ═══ ARTICOLI ═══ -->
-  <section class="section section--alt" id="articoli">
-    <div class="container">
-      <div class="section-header">
-        <div>
-          <div class="section-label">Blog</div>
-          <h2 class="section-title">Articoli e approfondimenti</h2>
-        </div>
-        <div class="filter-tabs">
-          <button class="filter-tab active" data-type="articolo">Articoli</button>
-          <button class="filter-tab" data-type="intervista">Interviste</button>
-        </div>
-      </div>
-      <div class="posts-grid" id="posts-grid"></div>
-      <div class="posts-loading" id="posts-loading">
-        <div class="loading-spinner"></div>
-      </div>
-      <p class="empty-state hidden" id="empty-state">Nessun articolo disponibile al momento.</p>
-      <div class="pagination" id="pagination"></div>
-    </div>
-  </section>
+
+
 
   <!-- ═══ CONTATTI ═══ -->
   <section class="section" id="contatti">
     <div class="container">
       <div class="section-label">Contatti</div>
       <h2 class="section-title">Parliamone</h2>
-      <p class="section-intro">Per informazioni, dubbi o per prenotare un primo colloquio conoscitivo, compila il modulo
-        qui sotto. Ti risponderò entro 24 ore.</p>
+      <p class="section-intro">Per richiedere informazioni o fissare un primo colloquio conoscitivo, compili il modulo
+        sottostante.</p>
 
       <div class="contact-layout">
         <form class="contact-form" id="contact-form" novalidate>
@@ -201,8 +249,8 @@
               <input type="text" id="contact-name" name="name" required />
             </div>
             <div class="form-group">
-              <label for="contact-email">Email *</label>
-              <input type="email" id="contact-email" name="email" required />
+              <label for="contact-tel">Telefono *</label>
+              <input type="tel" id="contact-tel" name="phone" required />
             </div>
           </div>
           <div class="form-group">
@@ -230,16 +278,28 @@
         </form>
         <div class="contact-info">
           <div class="contact-info-item">
-            <span class="contact-info-label">Email</span>
-            <span class="contact-info-value">info@danilolittarru.it</span>
-          </div>
-          <div class="contact-info-item">
             <span class="contact-info-label">Telefono</span>
-            <span class="contact-info-value">+39 000 000 0000</span>
+            <span class="contact-info-value">+39 393 463 5653</span>
           </div>
           <div class="contact-info-item">
             <span class="contact-info-label">Studio</span>
             <span class="contact-info-value">Cagliari, Sardegna</span>
+          </div>
+          <div class="contact-info-social">
+            <a href="https://www.facebook.com/danilo.littarru/" target="_blank" rel="noopener noreferrer"
+              class="social-link social-link--circle" title="Facebook">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="20" height="20" fill="currentColor">
+                <path
+                  d="M504 256C504 119 393 8 256 8S8 119 8 256c0 123.8 90.7 226.4 209.3 245V327.7h-63V256h63v-54.6c0-62.2 37-96.6 93.7-96.6 27.2 0 55.7 4.9 55.7 4.9V171h-31.3c-30.8 0-40.4 19.1-40.4 38.7V256h68.8l-11 71.7h-57.8V501C413.3 482.4 504 379.8 504 256z" />
+              </svg>
+            </a>
+            <a href="https://www.instagram.com/dr_danilo_littarru_psicologo_/" target="_blank" rel="noopener noreferrer"
+              class="social-link social-link--circle" title="Instagram">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512" width="20" height="20" fill="currentColor">
+                <path
+                  d="M224.1 141c-63.6 0-114.9 51.3-114.9 114.9s51.3 114.9 114.9 114.9S339 319.5 339 255.9 287.7 141 224.1 141zm0 189.6c-41.1 0-74.7-33.5-74.7-74.7s33.5-74.7 74.7-74.7 74.7 33.5 74.7 74.7-33.6 74.7-74.7 74.7zm146.4-194.3c0 14.9-12 26.8-26.8 26.8-14.9 0-26.8-12-26.8-26.8s12-26.8 26.8-26.8 26.8 12 26.8 26.8zm76.1 27.2c-1.7-35.9-9.9-67.7-36.2-93.9-26.2-26.2-58-34.4-93.9-36.2-37-2.1-147.9-2.1-184.9 0-35.8 1.7-67.6 9.9-93.9 36.1s-34.4 58-36.2 93.9c-2.1 37-2.1 147.9 0 184.9 1.7 35.8 9.9 67.6 36.1 93.9s58 34.4 93.9 36.2c37 2.1 147.9 2.1 184.9 0 35.9-1.7 67.7-9.9 93.9-36.2 26.2-26.2 34.4-58 36.2-93.9 2.1-37 2.1-147.8 0-184.8zM398.8 388c-7.8 19.6-22.9 34.7-42.6 42.6-29.5 11.7-99.5 9-132.1 9s-102.7 2.6-132.1-9c-19.6-7.8-34.7-22.9-42.6-42.6-11.7-29.5-9-99.5-9-132.1s-2.6-102.7 9-132.1c7.8-19.6 22.9-34.7 42.6-42.6 29.5-11.7 99.5-9 132.1-9s102.7-2.6 132.1 9c19.6 7.8 34.7 22.9 42.6 42.6 11.7 29.5 9 99.5 9 132.1s2.7 102.7-9 132.1z" />
+              </svg>
+            </a>
           </div>
         </div>
       </div>
@@ -251,22 +311,39 @@
     <div class="container footer-inner">
       <div class="footer-brand">
         <span class="logo-mark">DL</span>
-        <div>
+        <div class="footer-brand-info">
           <div class="footer-name">Danilo Littarru</div>
           <div class="footer-sub">Psicologo · Psicoterapeuta</div>
+          <div class="footer-social">
+            <a href="https://www.facebook.com/danilo.littarru/" target="_blank" rel="noopener noreferrer"
+              class="social-link" aria-label="Facebook">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="20" height="20" fill="currentColor">
+                <path
+                  d="M504 256C504 119 393 8 256 8S8 119 8 256c0 123.8 90.7 226.4 209.3 245V327.7h-63V256h63v-54.6c0-62.2 37-96.6 93.7-96.6 27.2 0 55.7 4.9 55.7 4.9V171h-31.3c-30.8 0-40.4 19.1-40.4 38.7V256h68.8l-11 71.7h-57.8V501C413.3 482.4 504 379.8 504 256z" />
+              </svg>
+            </a>
+            <a href="https://www.instagram.com/dr_danilo_littarru_psicologo_/" target="_blank" rel="noopener noreferrer"
+              class="social-link" aria-label="Instagram">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512" width="20" height="20" fill="currentColor">
+                <path
+                  d="M224.1 141c-63.6 0-114.9 51.3-114.9 114.9s51.3 114.9 114.9 114.9S339 319.5 339 255.9 287.7 141 224.1 141zm0 189.6c-41.1 0-74.7-33.5-74.7-74.7s33.5-74.7 74.7-74.7 74.7 33.5 74.7 74.7-33.6 74.7-74.7 74.7zm146.4-194.3c0 14.9-12 26.8-26.8 26.8-14.9 0-26.8-12-26.8-26.8s12-26.8 26.8-26.8 26.8 12 26.8 26.8zm76.1 27.2c-1.7-35.9-9.9-67.7-36.2-93.9-26.2-26.2-58-34.4-93.9-36.2-37-2.1-147.9-2.1-184.9 0-35.8 1.7-67.6 9.9-93.9 36.1s-34.4 58-36.2 93.9c-2.1 37-2.1 147.9 0 184.9 1.7 35.8 9.9 67.6 36.1 93.9s58 34.4 93.9 36.2c37 2.1 147.9 2.1 184.9 0 35.9-1.7 67.7-9.9 93.9-36.2 26.2-26.2 34.4-58 36.2-93.9 2.1-37 2.1-147.8 0-184.8zM398.8 388c-7.8 19.6-22.9 34.7-42.6 42.6-29.5 11.7-99.5 9-132.1 9s-102.7 2.6-132.1-9c-19.6-7.8-34.7-22.9-42.6-42.6-11.7-29.5-9-99.5-9-132.1s-2.6-102.7 9-132.1c7.8-19.6 22.9-34.7 42.6-42.6 29.5-11.7 99.5-9 132.1-9s102.7-2.6 132.1 9c19.6 7.8 34.7 22.9 42.6 42.6 11.7 29.5 9 99.5 9 132.1s2.7 102.7-9 132.1z" />
+              </svg>
+            </a>
+          </div>
         </div>
       </div>
       <nav class="footer-nav">
         <a href="#chi-sono">Chi sono</a>
         <a href="#competenze">Competenze</a>
         <a href="#servizi">Servizi</a>
-        <a href="#articoli">Articoli</a>
+        <a href="#articoli" data-tab="articolo">Articoli</a>
+        <a href="#articoli" data-tab="intervista">Interviste</a>
         <a href="#contatti">Contatti</a>
       </nav>
     </div>
     <div class="container footer-bottom">
       <p>© <span id="footer-year">2026</span> Danilo Littarru — Tutti i diritti riservati</p>
-      <p>P.IVA: 00000000000 · Albo degli Psicologi della Sardegna n. 0000</p>
+      <p>· Albo degli Psicologi della Sardegna n. 3946</p>
     </div>
   </footer>
 
@@ -279,7 +356,7 @@
     </div>
   </div>
 
-  <script src="/js/app.js"></script>
+  <script src="/js/app.js?v=4"></script>
 </body>
 
 </html>

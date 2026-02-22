@@ -47,6 +47,12 @@ function getCsrfToken() {
   return match ? decodeURIComponent(match[1]) : '';
 }
 
+function getYouTubeId(url) {
+  if (!url) return null;
+  const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:v\/|u\/\w\/|embed\/|watch\?v=))([^#&?]*)/);
+  return (match && match[1].length === 11) ? match[1] : null;
+}
+
 // ═══════════════════════════════
 // API
 // ═══════════════════════════════
@@ -88,6 +94,36 @@ function initMenu() {
     btn.classList.toggle('open', open);
     btn.setAttribute('aria-expanded', String(open));
   });
+
+  // Gestione link con cambio tab (Articoli / Interviste)
+  document.addEventListener('click', e => {
+    const link = e.target.closest('[data-tab]');
+    if (!link) return;
+
+    // Cambia tab nello stato
+    state.currentType = link.dataset.tab;
+    state.currentPage = 1;
+
+    // Aggiorna UI dei tab nel blog
+    $$('.filter-tab').forEach(t => {
+      t.classList.toggle('active', t.dataset.type === state.currentType);
+    });
+
+    // Chiudi menu mobile se aperto
+    if (nav.classList.contains('open')) {
+      nav.classList.remove('open');
+      btn.classList.remove('open');
+      btn.setAttribute('aria-expanded', 'false');
+    }
+
+    // Ricarica post
+    loadPosts();
+
+    // Scorri alla sezione articoli
+    const target = $('#articoli');
+    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+
   $$('.nav-link', nav).forEach(link => {
     link.addEventListener('click', () => {
       nav.classList.remove('open');
@@ -254,12 +290,22 @@ function renderPostDetail(post, comments, container) {
   meta.appendChild(el('span', {}, `${post.visit_count || 0} letture`));
   frag.appendChild(meta);
 
-  if (post.cover_image) {
+  if (post.cover_image && post.type !== 'intervista') {
     frag.appendChild(el('img', {
       class: 'post-detail-cover',
       src: post.cover_image,
       alt: post.title,
     }));
+  }
+
+  // Se è un'intervista e ha un link YouTube, mostra il video in cima
+  if (post.type === 'intervista') {
+    const videoId = getYouTubeId(post.content);
+    if (videoId) {
+      const videoWrap = el('div', { class: 'video-wrapper', style: 'aspect-ratio:16/9; margin-bottom:2rem; border-radius:12px; overflow:hidden; background:#000;' });
+      videoWrap.innerHTML = `<iframe width="100%" height="100%" src="https://www.youtube-nocookie.com/embed/${videoId}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>`;
+      frag.appendChild(videoWrap);
+    }
   }
 
   const contentDiv = el('div', { class: 'post-detail-content prose', html: post.content });
