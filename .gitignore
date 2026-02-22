@@ -1,0 +1,14 @@
+node_modules/
+.env
+.env.local
+.env.production
+dist/
+build/
+.DS_Store
+*.log
+npm-debug.log*
+public/uploads/*
+!public/uploads/.gitkeep
+.vercel/
+coverage/
+*.tmp
