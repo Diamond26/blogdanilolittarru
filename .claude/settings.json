@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "auto-edit",
+      "Bash",
+      "Edit",
+      "Read",
+      "Write",
+      "Upload",
+      "Download",
+      "Delete",
+      "Search",
+      "Edit", 
+      "All"
+    ]
+  }
+}
