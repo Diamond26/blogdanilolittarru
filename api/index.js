@@ -24,9 +24,10 @@ const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const crypto = require('crypto');
 const path = require('path');
-const { callProc } = require('../utils/db');
+const { getPool } = require('../utils/db');
 
 const app = express();
+app.set('trust proxy', true);
 
 // ═══════════════════════════════════════
 // SECURITY HEADERS (Helmet)
@@ -106,14 +107,21 @@ app.use((req, res, next) => {
 });
 
 // ═══════════════════════════════════════
-// CONTATORE VISITE SITO (stored procedure)
+// CONTATORE VISITE SITO (Direct SQL)
 // ═══════════════════════════════════════
 app.use(async (req, res, next) => {
-  if (req.method === 'GET' && !req.path.startsWith('/api')) {
+  // Incrementa solo sulla home page, escludendo file statici e API
+  if (req.method === 'GET' && req.path === '/') {
     try {
+      const db = require('../utils/db').getPool();
       const today = new Date().toISOString().slice(0, 10);
-      await callProc('sp_increment_site_visits', [today]);
-    } catch (_) { }
+      await db.execute(
+        'INSERT INTO site_visits (visit_date, count) VALUES (?, 1) ON DUPLICATE KEY UPDATE count = count + 1',
+        [today]
+      );
+    } catch (err) {
+      console.error('Visit counter error:', err.message);
+    }
   }
   next();
 });

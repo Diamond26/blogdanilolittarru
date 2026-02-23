@@ -4,7 +4,6 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const rateLimit = require('express-rate-limit');
 const { body, validationResult } = require('express-validator');
-const { callProc, callProcOne } = require('../utils/db');
 const { requireAdmin } = require('../middleware/auth');
 
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -28,8 +27,8 @@ const loginLimiter = rateLimit({
 router.post('/login',
   loginLimiter,
   [
-    body('email').isEmail().normalizeEmail().withMessage('Email non valida.'),
-    body('password').isLength({ min: 6 }).withMessage('Password troppo corta.'),
+    body('email').trim().notEmpty().withMessage('Inserisci username/email.'),
+    body('password').isLength({ min: 5 }).withMessage('Password troppo corta.'),
   ],
   async (req, res) => {
     const errors = validationResult(req);
@@ -38,19 +37,21 @@ router.post('/login',
     }
 
     const { email, password } = req.body;
+    const db = require('../utils/db').getPool();
 
     try {
-      const user = await callProcOne('sp_admin_login', [email]);
+      const [rows] = await db.execute('SELECT * FROM users WHERE email = ? LIMIT 1', [email]);
+      const user = rows[0];
 
       const fakeHash = '$2a$12$invalidhashfortimingprotection1234567890';
       const passwordToCheck = user ? user.password : fakeHash;
       const isValid = await bcrypt.compare(password, passwordToCheck);
 
       if (!user || !isValid || user.role !== 'admin') {
-        await callProc('sp_insert_admin_log', [
-          null, 'LOGIN_FAILED', 'auth', null, req.ip,
-          JSON.stringify({ email })
-        ]);
+        await db.execute(
+          'INSERT INTO admin_logs (user_id, action, entity_type, ip_address, details) VALUES (?, ?, ?, ?, ?)',
+          [null, 'LOGIN_FAILED', 'auth', req.ip, JSON.stringify({ email })]
+        );
         return res.status(401).json({ error: 'Credenziali non valide.' });
       }
 
@@ -62,9 +63,10 @@ router.post('/login',
 
       res.cookie('token', token, COOKIE_OPTIONS);
 
-      await callProc('sp_insert_admin_log', [
-        user.id, 'LOGIN_SUCCESS', 'auth', null, req.ip, null
-      ]);
+      await db.execute(
+        'INSERT INTO admin_logs (user_id, action, entity_type, ip_address) VALUES (?, ?, ?, ?)',
+        [user.id, 'LOGIN_SUCCESS', 'auth', req.ip]
+      );
 
       return res.json({ ok: true, message: 'Accesso effettuato.' });
     } catch (err) {
@@ -76,9 +78,11 @@ router.post('/login',
 
 // POST /api/auth/logout
 router.post('/logout', requireAdmin, async (req, res) => {
-  await callProc('sp_insert_admin_log', [
-    req.user.id, 'LOGOUT', 'auth', null, req.ip, null
-  ]);
+  const db = require('../utils/db').getPool();
+  await db.execute(
+    'INSERT INTO admin_logs (user_id, action, entity_type, ip_address) VALUES (?, ?, ?, ?)',
+    [req.user.id, 'LOGOUT', 'auth', req.ip]
+  );
   res.clearCookie('token', { ...COOKIE_OPTIONS, maxAge: 0 });
   return res.json({ ok: true, message: 'Disconnesso.' });
 });

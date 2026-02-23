@@ -55,7 +55,7 @@ function generateSlug(title) {
  */
 function generateFingerprint(req) {
   const crypto = require('crypto');
-  const ip = req.ip || req.headers['x-forwarded-for'] || 'unknown';
+  const ip = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
   const ua = req.headers['user-agent'] || '';
   return crypto.createHash('sha256').update(ip + ua).digest('hex');
 }

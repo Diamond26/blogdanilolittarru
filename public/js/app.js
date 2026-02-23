@@ -486,12 +486,13 @@ function initContactForm() {
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const name = form.querySelector('#contact-name').value.trim();
-    const email = form.querySelector('#contact-email').value.trim();
-    const message = form.querySelector('#contact-message').value.trim();
-    const privacy = form.querySelector('input[name="privacy"]').checked;
+    const name = $('#contact-name')?.value.trim();
+    const phone = $('#contact-tel')?.value.trim();
+    const subject = $('#contact-subject')?.value;
+    const message = $('#contact-message')?.value.trim();
+    const privacy = form.querySelector('input[name="privacy"]')?.checked;
 
-    if (!name || !email || !message) {
+    if (!name || !phone || !message) {
       showFormStatus(statusEl, 'Compila tutti i campi obbligatori.', 'error');
       return;
     }
@@ -499,13 +500,23 @@ function initContactForm() {
       showFormStatus(statusEl, 'Accetta la privacy policy per continuare.', 'error');
       return;
     }
+
     submitBtn.disabled = true;
     submitBtn.textContent = 'Invio in corso…';
-    await new Promise(r => setTimeout(r, 1000));
-    showFormStatus(statusEl, '✓ Messaggio inviato. Ti risponderò entro 24 ore.', 'success');
-    form.reset();
-    submitBtn.disabled = false;
-    submitBtn.textContent = 'Invia messaggio';
+
+    try {
+      await api('/contacts', {
+        method: 'POST',
+        body: JSON.stringify({ name, phone, subject, message })
+      });
+      showFormStatus(statusEl, '✓ Messaggio inviato con successo. Grazie!', 'success');
+      form.reset();
+    } catch (err) {
+      showFormStatus(statusEl, err.message || 'Errore durante l\'invio.', 'error');
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Invia messaggio';
+    }
   });
 }
 

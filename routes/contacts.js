@@ -2,7 +2,7 @@
 
 const express = require('express');
 const router = express.Router();
-const { callProc } = require('../utils/db');
+const { getPool } = require('../utils/db');
 const { requireAdmin } = require('../middleware/auth');
 const nodemailer = require('nodemailer');
 
@@ -15,12 +15,16 @@ router.post('/', async (req, res) => {
     }
 
     try {
-        const { insertId } = await callProc('sp_insert_contact', [name, phone, subject, message]);
+        const db = require('../utils/db').getPool();
+        const [result] = await db.execute(
+            'INSERT INTO contacts (name, phone, subject, message) VALUES (?, ?, ?, ?)',
+            [name, phone, subject, message]
+        );
 
-        // Invio Email di notifica (Asincrono, non blocca la risposta)
+        // Invio Email di notifica (Asincrono)
         sendNotificationEmail(name, phone, subject, message).catch(console.error);
 
-        res.json({ success: true, id: insertId });
+        res.json({ success: true, id: result.insertId });
     } catch (err) {
         console.error('Contact error:', err);
         res.status(500).json({ error: 'Errore nel salvataggio del messaggio.' });
@@ -30,7 +34,8 @@ router.post('/', async (req, res) => {
 // GET /api/contacts - Lista admin
 router.get('/', requireAdmin, async (req, res) => {
     try {
-        const contacts = await callProc('sp_get_contacts');
+        const db = require('../utils/db').getPool();
+        const [contacts] = await db.execute('SELECT * FROM contacts ORDER BY created_at DESC');
         res.json({ contacts });
     } catch (err) {
         res.status(500).json({ error: 'Errore nel recupero dei messaggi.' });
@@ -40,7 +45,8 @@ router.get('/', requireAdmin, async (req, res) => {
 // PATCH /api/contacts/:id/read - Segna come letto
 router.patch('/:id/read', requireAdmin, async (req, res) => {
     try {
-        await callProc('sp_mark_contact_read', [req.params.id]);
+        const db = require('../utils/db').getPool();
+        await db.execute('UPDATE contacts SET is_read = 1 WHERE id = ?', [req.params.id]);
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: 'Errore nell\'aggiornamento del messaggio.' });
@@ -50,7 +56,8 @@ router.patch('/:id/read', requireAdmin, async (req, res) => {
 // DELETE /api/contacts/:id - Elimina
 router.delete('/:id', requireAdmin, async (req, res) => {
     try {
-        await callProc('sp_delete_contact', [req.params.id]);
+        const db = require('../utils/db').getPool();
+        await db.execute('DELETE FROM contacts WHERE id = ?', [req.params.id]);
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: 'Errore nell\'eliminazione del messaggio.' });

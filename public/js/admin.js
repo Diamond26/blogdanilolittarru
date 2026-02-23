@@ -89,18 +89,30 @@ function initLogout() {
 }
 
 function switchView(viewName) {
-  $$('.admin-view').forEach(v => v.classList.remove('active'));
+  $$('.admin-view').forEach(v => {
+    v.classList.remove('active');
+    v.classList.add('hidden');
+  });
   $$('.sidebar-link').forEach(l => l.classList.remove('active'));
+
   const viewEl = $(`#view-${viewName}`);
-  if (viewEl) viewEl.classList.add('active');
+  if (viewEl) {
+    viewEl.classList.add('active');
+    viewEl.classList.remove('hidden');
+  }
+
   const navBtn = $(`.sidebar-link[data-view="${viewName}"]`);
   if (navBtn) navBtn.classList.add('active');
+
   const titles = { dashboard: 'Dashboard', posts: 'Articoli', 'new-post': 'Nuovo articolo', comments: 'Commenti', contacts: 'Messaggi', logs: 'Log attività' };
   const title = $('#admin-view-title');
   if (title) title.textContent = titles[viewName] || 'Admin';
+
   if (viewName === 'dashboard') loadDashboard();
   else if (viewName === 'posts') loadAllPosts();
-  else if (viewName === 'new-post') initNewPost();
+  else if (viewName === 'new-post') {
+    if (!editingPostId) initNewPost();
+  }
   else if (viewName === 'comments') loadComments();
   else if (viewName === 'contacts') loadContacts();
   else if (viewName === 'logs') loadLogs();
@@ -164,9 +176,9 @@ async function loadAllPosts() {
 }
 
 function initNewPost() {
-  editingPostId = null;
   $('#post-editor-title').textContent = 'Nuovo articolo';
   $('#post-editor-form').reset();
+  editingPostId = null;
   $('#edit-post-id').value = '';
   $('#cover-preview').innerHTML = '';
   if (quillEditor) { quillEditor.setContents([]); } else { initQuill(); }
@@ -175,7 +187,8 @@ function initNewPost() {
 }
 
 async function editPost(postId) {
-  switchView('new-post'); editingPostId = postId;
+  editingPostId = postId;
+  switchView('new-post');
   $('#post-editor-title').textContent = 'Modifica articolo';
   $('#edit-post-id').value = postId;
   try {

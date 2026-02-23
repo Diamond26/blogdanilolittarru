@@ -50,24 +50,32 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--c-ivory);
+  background: radial-gradient(circle at center, var(--c-ivory) 0%, #F0EBE6 100%);
+  padding: 1.5rem;
 }
 
 .login-box {
   width: 100%;
-  max-width: 400px;
+  max-width: 420px;
   background: var(--c-warm-white);
-  border: 1px solid var(--c-border);
-  border-radius: 8px;
-  padding: 2.5rem;
-  box-shadow: 0 4px 24px rgba(44, 42, 39, .08);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  border-radius: 12px;
+  padding: 3rem 2.5rem;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04);
+  transition: transform 0.3s ease;
+}
+
+.login-box:hover {
+  transform: translateY(-4px);
 }
 
 .login-brand {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 1rem;
-  margin-bottom: 2rem;
+  justify-content: center;
+  margin-bottom: 2.5rem;
+  text-align: center;
 }
 
 .login-logo {
