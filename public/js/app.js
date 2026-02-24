@@ -246,8 +246,9 @@ function renderPostCard(post) {
     onkeydown: (e) => { if (e.key === 'Enter') openPost(post.slug); },
   });
 
-  const imgWrap = el('div', { class: 'post-card-image' });
+  const imgWrap = el('div', { class: 'post-card-image', style: 'position: relative;' });
   const cardImage = post.type === 'intervista' ? getInterviewCover(post) : post.cover_image;
+  
   if (cardImage) {
     const img = el('img', { src: cardImage, alt: post.title, loading: 'lazy' });
     imgWrap.appendChild(img);
@@ -256,15 +257,24 @@ function renderPostCard(post) {
     imgWrap.appendChild(ph);
   }
 
+  // Se è un'intervista, aggiungiamo l'icona Play al centro dell'immagine
+  if (post.type === 'intervista') {
+    const playIcon = el('div', { class: 'play-icon-overlay' });
+    playIcon.innerHTML = '<i class="fa-solid fa-circle-play"></i>';
+    imgWrap.appendChild(playIcon);
+  }
+
   const body = el('div', { class: 'post-card-body' });
   body.appendChild(el('span', { class: 'post-card-type' }, post.type === 'intervista' ? 'Intervista' : 'Articolo'));
   body.appendChild(el('h3', { class: 'post-card-title' }, post.title));
+  
   if (post.excerpt) {
     body.appendChild(el('p', { class: 'post-card-excerpt' }, post.excerpt));
   }
 
   const meta = el('div', { class: 'post-card-meta' });
   meta.appendChild(el('span', { class: 'post-card-date' }, formatDate(post.published_at)));
+  
   const stats = el('div', { class: 'post-card-stats' });
   stats.appendChild(el('span', { class: 'post-stat' }, `♡ ${post.like_count || 0}`));
   stats.appendChild(el('span', { class: 'post-stat' }, `◎ ${post.comment_count || 0}`));
@@ -352,18 +362,18 @@ function renderPostDetail(post, comments, container) {
   if (post.type === 'intervista') {
     const interviewUrl = (post.content || '').trim();
     const videoId = getYouTubeId(interviewUrl);
+    
     if (videoId) {
-      const videoWrap = el('div', { class: 'video-wrapper', style: 'aspect-ratio:16/9; margin-bottom:2rem; border-radius:12px; overflow:hidden; background:#000;' });
-      videoWrap.innerHTML = `<iframe width="100%" height="100%" src="https://www.youtube-nocookie.com/embed/${videoId}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>`;
+      const videoWrap = el('div', { class: 'video-wrapper', style: 'aspect-ratio:16/9; margin-bottom:1.5rem; border-radius:12px; overflow:hidden; background:#000;' });
+      videoWrap.innerHTML = `<iframe width="100%" height="100%" src="https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>`;
       frag.appendChild(videoWrap);
-    } else if (interviewUrl) {
-      frag.appendChild(el('a', {
-        class: 'btn btn-primary',
-        href: interviewUrl,
-        target: '_blank',
-        rel: 'noopener noreferrer',
-        style: 'display:inline-flex; margin-bottom:1.25rem;',
-      }, 'Guarda l\'intervista su YouTube'));
+
+      // Mostriamo la descrizione del video scaricata da YouTube
+      if (post.excerpt) {
+        const descDiv = el('div', { class: 'post-detail-content prose' });
+        descDiv.innerHTML = `<p style="white-space: pre-wrap;">${post.excerpt}</p>`; 
+        frag.appendChild(descDiv);
+      }
     }
   } else {
     const contentDiv = el('div', { class: 'post-detail-content prose', html: post.content });

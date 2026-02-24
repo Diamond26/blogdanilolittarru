@@ -559,6 +559,7 @@ h4 {
   aspect-ratio: 16/10;
   background: var(--c-bg-alt);
   overflow: hidden;
+  position: relative; /* Necessario per posizionare l'icona play */
 }
 
 .post-card-image img {
@@ -1210,10 +1211,6 @@ h4 {
   width: 60%;
 }
 
-.post-detail-loading .loading-line:nth-child(2) {
-  width: 90%;
-}
-
 .post-detail-loading .loading-line.short {
   width: 40%;
 }
@@ -1520,4 +1517,38 @@ h4 {
   align-items: center;
   justify-content: center;
   z-index: 10;
+}
+
+/* =========================================
+   STILE TASTO PLAY PER LE INTERVISTE
+   ========================================= */
+.play-icon-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 3.5rem;
+  color: rgba(255, 255, 255, 0.9);
+  filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5));
+  transition: transform 0.3s ease;
+  pointer-events: none;
+  z-index: 2;
+  background: none !important;
+  border: none !important;
+}
+
+/* Target specifico per l'icona per rimuovere sfondi o bordi ereditati */
+.play-icon-overlay i {
+    background: transparent !important;
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+    color: inherit !important; /* Mantiene il colore del genitore */
+}
+
+/* Hover sulla card: solo zoom, colore bloccato e nessuno sfondo */
+.post-card:hover .play-icon-overlay {
+  transform: translate(-50%, -50%) scale(1.15);
+  color: rgba(255, 255, 255, 0.9) !important;
+  background: none !important;
 }
