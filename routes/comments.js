@@ -1,14 +1,16 @@
 const express = require('express');
 const router = express.Router();
 const { body, validationResult } = require('express-validator');
-const { getPool } = require('../utils/db');
-const { requireAdmin } = require('../middleware/auth');
+const { requireAdmin, optionalAuth } = require('../middleware/auth');
 const { sanitizeText } = require('../middleware/security');
 
-// POST /api/comments â€” Aggiungi commento
-router.post('/', [
+// POST /api/comments — Aggiungi commento
+router.post('/', optionalAuth, [
   body('post_id').isInt({ min: 1 }).withMessage('post_id non valido.'),
-  body('parent_id').optional().isInt({ min: 1 }),
+  body('parent_id')
+    .optional({ values: 'null' })
+    .isInt({ min: 1 })
+    .withMessage('parent_id non valido.'),
   body('author_name').trim().notEmpty().isLength({ max: 150 }).withMessage('Nome obbligatorio.'),
   body('author_email').isEmail().normalizeEmail().withMessage('Email non valida.'),
   body('content').trim().notEmpty().isLength({ max: 2000 }).withMessage('Commento obbligatorio (max 2000 caratteri).'),
@@ -18,9 +20,10 @@ router.post('/', [
 
   const { post_id, parent_id = null, author_name, author_email, content } = req.body;
   const db = require('../utils/db').getPool();
+  const statusFilter = req.user ? '%' : 'published';
 
   try {
-    const [postRows] = await db.execute('SELECT id FROM posts WHERE id = ? AND status = "published" LIMIT 1', [post_id]);
+    const [postRows] = await db.execute('SELECT id FROM posts WHERE id = ? AND status LIKE ? LIMIT 1', [post_id, statusFilter]);
     if (postRows.length === 0) return res.status(404).json({ error: 'Articolo non trovato.' });
 
     if (parent_id) {
@@ -35,7 +38,7 @@ router.post('/', [
 
     return res.status(201).json({
       ok: true,
-      message: 'Commento inviato. SarÃ  visibile dopo approvazione.',
+      message: 'Commento inviato. Sara visibile dopo approvazione.',
       id: result.insertId,
     });
   } catch (err) {
@@ -44,7 +47,7 @@ router.post('/', [
   }
 });
 
-// GET /api/comments/pending â€” Lista commenti da approvare (admin)
+// GET /api/comments/pending — Lista commenti da approvare (admin)
 router.get('/pending', requireAdmin, async (req, res) => {
   try {
     const db = require('../utils/db').getPool();
@@ -62,7 +65,7 @@ router.get('/pending', requireAdmin, async (req, res) => {
   }
 });
 
-// PATCH /api/comments/:id/approve â€” Approva commento (admin)
+// PATCH /api/comments/:id/approve — Approva commento (admin)
 router.patch('/:id/approve', requireAdmin, async (req, res) => {
   const { id } = req.params;
   const db = require('../utils/db').getPool();
@@ -73,7 +76,7 @@ router.patch('/:id/approve', requireAdmin, async (req, res) => {
     await db.execute(`
       INSERT INTO admin_logs (user_id, action, entity_type, entity_id, ip_address, details)
       VALUES (?, ?, ?, ?, ?, ?)
-    `, [req.user.id, 'COMMENT_APPROVED', 'comment', parseInt(id), req.ip, null]);
+    `, [req.user.id, 'COMMENT_APPROVED', 'comment', parseInt(id, 10), req.ip, null]);
 
     return res.json({ ok: true });
   } catch (err) {
@@ -82,7 +85,7 @@ router.patch('/:id/approve', requireAdmin, async (req, res) => {
   }
 });
 
-// DELETE /api/comments/:id â€” Elimina commento (admin)
+// DELETE /api/comments/:id — Elimina commento (admin)
 router.delete('/:id', requireAdmin, async (req, res) => {
   const { id } = req.params;
   const db = require('../utils/db').getPool();
@@ -93,7 +96,7 @@ router.delete('/:id', requireAdmin, async (req, res) => {
     await db.execute(`
       INSERT INTO admin_logs (user_id, action, entity_type, entity_id, ip_address, details)
       VALUES (?, ?, ?, ?, ?, ?)
-    `, [req.user.id, 'COMMENT_DELETED', 'comment', parseInt(id), req.ip, null]);
+    `, [req.user.id, 'COMMENT_DELETED', 'comment', parseInt(id, 10), req.ip, null]);
 
     return res.json({ ok: true });
   } catch (err) {

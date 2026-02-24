@@ -6,24 +6,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="robots" content="noindex, nofollow" />
   <meta name="googlebot" content="noindex" />
-  <title>Pannello Admin — Danilo Littarru</title>
+  <title>Pannello Admin - Danilo Littarru</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link
-    href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=Source+Serif+4:opsz,wght@8..60,300;8..60,400&display=swap"
-    rel="stylesheet" />
-  <!-- Rich text editor -->
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/quill/1.3.7/quill.snow.min.css" />
-  <link rel="stylesheet" href="/css/admin.css" />
+  <link rel="stylesheet" href="/css/admin.css?v=5" />
 </head>
 
 <body>
-
-  <!-- LOGIN SCREEN -->
   <div id="login-screen" class="login-screen">
     <div class="login-box">
       <div class="login-brand">
-        <img src="/img/logo.png" alt="Danilo Littarru" class="login-logo-img"
-          style="max-width: 160px; margin-bottom: 0.5rem;" />
+        <img src="/img/logo.png" alt="Danilo Littarru" class="login-logo-img" />
         <div class="logo-name">Area Riservata</div>
         <div class="logo-title">DANILO LITTARRU</div>
       </div>
@@ -42,50 +37,44 @@
     </div>
   </div>
 
-  <!-- ADMIN APP -->
   <div id="admin-app" class="admin-app hidden">
-
-    <!-- Sidebar -->
     <aside class="admin-sidebar">
       <div class="sidebar-brand">
-        <img src="/img/logo.png" alt="Danilo Littarru" class="admin-sidebar-logo"
-          style="max-width: 140px; filter: brightness(0) invert(1);" />
+        <img src="/img/logo.png" alt="Danilo Littarru" class="admin-sidebar-logo" />
       </div>
       <nav class="sidebar-nav">
         <button class="sidebar-link active" data-view="dashboard">
-          <span class="nav-icon">◈</span> Dashboard
+          <span class="nav-icon">D</span> Dashboard
         </button>
         <button class="sidebar-link" data-view="posts">
-          <span class="nav-icon">◎</span> Articoli
+          <span class="nav-icon">A</span> Articoli
         </button>
         <button class="sidebar-link" data-view="new-post">
-          <span class="nav-icon">＋</span> Nuovo articolo
+          <span class="nav-icon">+</span> Nuovo articolo
         </button>
         <button class="sidebar-link" data-view="comments">
-          <span class="nav-icon">◷</span> Commenti
+          <span class="nav-icon">C</span> Commenti
         </button>
         <button class="sidebar-link" data-view="contacts">
-          <span class="nav-icon">✉</span> Messaggi
+          <span class="nav-icon">M</span> Messaggi
         </button>
         <button class="sidebar-link" data-view="logs">
-          <span class="nav-icon">≡</span> Log attività
+          <span class="nav-icon">L</span> Log attivita
         </button>
       </nav>
       <div class="sidebar-footer">
         <button id="logout-btn" class="sidebar-link logout-link">
-          <span class="nav-icon">→</span> Logout
+          <span class="nav-icon">-></span> Logout
         </button>
       </div>
     </aside>
 
-    <!-- Main content -->
     <main class="admin-main">
       <div class="admin-topbar">
         <h1 class="admin-view-title" id="admin-view-title">Dashboard</h1>
         <span class="admin-user-label" id="admin-user-label"></span>
       </div>
 
-      <!-- DASHBOARD VIEW -->
       <div class="admin-view active" id="view-dashboard">
         <div class="stats-grid" id="stats-grid">
           <div class="stat-card skeleton"></div>
@@ -104,14 +93,13 @@
           </div>
           <div class="admin-card">
             <div class="admin-card-header">
-              <h3>Attività recente</h3>
+              <h3>Attivita recente</h3>
             </div>
             <div id="recent-logs-list"></div>
           </div>
         </div>
       </div>
 
-      <!-- POSTS VIEW -->
       <div class="admin-view hidden" id="view-posts">
         <div class="admin-card">
           <div class="admin-card-header">
@@ -134,7 +122,6 @@
         </div>
       </div>
 
-      <!-- NEW/EDIT POST VIEW -->
       <div class="admin-view hidden" id="view-new-post">
         <div class="admin-card">
           <div class="admin-card-header">
@@ -142,6 +129,7 @@
           </div>
           <form id="post-editor-form" novalidate>
             <input type="hidden" id="edit-post-id" />
+            <input type="hidden" id="pe-remove-cover" name="remove_cover_image" value="0" />
             <div class="form-row">
               <div class="form-group">
                 <label for="pe-title">Titolo *</label>
@@ -155,39 +143,45 @@
                 </select>
               </div>
             </div>
-            <div class="form-group">
-              <label for="pe-excerpt">Estratto (opzionale)</label>
-              <textarea id="pe-excerpt" name="excerpt" rows="2"
-                placeholder="Breve descrizione dell'articolo..."></textarea>
+            <div class="form-group hidden" id="pe-youtube-group">
+              <label for="pe-youtube-url">Link YouTube intervista *</label>
+              <input type="url" id="pe-youtube-url" name="youtube_url"
+                placeholder="https://www.youtube.com/watch?v=..." />
+              <small class="field-hint">Per le interviste basta il link: titolo, descrizione, data e copertina vengono presi dal
+                video.</small>
+              <div id="pe-youtube-preview" class="youtube-preview hidden" aria-live="polite"></div>
             </div>
-            <div class="form-group">
+            <div class="form-group" id="pe-excerpt-group">
+              <label for="pe-excerpt">Estratto (opzionale)</label>
+              <textarea id="pe-excerpt" name="excerpt" rows="2" placeholder="Breve descrizione dell'articolo..."></textarea>
+            </div>
+            <div class="form-group" id="pe-content-group">
               <label>Contenuto *</label>
-              <div id="quill-editor" style="min-height:320px;background:var(--c-warm-white);"></div>
+              <div id="quill-editor" style="min-height:320px;background:var(--c-surface);"></div>
             </div>
             <div class="form-row">
-              <div class="form-group">
+              <div class="form-group" id="pe-cover-group">
                 <label for="pe-cover">Immagine di copertina</label>
                 <input type="file" id="pe-cover" name="cover_image" accept="image/*" />
                 <div id="cover-preview" class="cover-preview"></div>
               </div>
-              <div class="form-group">
+              <div class="form-group" id="pe-status-group">
                 <label for="pe-status">Stato</label>
                 <select id="pe-status" name="status">
+                  <option value="published" selected>Pubblicato</option>
                   <option value="draft">Bozza</option>
-                  <option value="published">Pubblicato</option>
                 </select>
               </div>
             </div>
             <div class="form-status hidden" id="post-editor-status" role="alert"></div>
             <div class="editor-actions">
               <button type="submit" class="btn btn-primary" id="post-editor-submit">Salva articolo</button>
-              <button type="button" class="btn btn-ghost" onclick="switchView('posts')">Annulla</button>
+              <button type="button" class="btn btn-ghost" data-action="cancel-edit">Annulla</button>
             </div>
           </form>
         </div>
       </div>
 
-      <!-- COMMENTS VIEW -->
       <div class="admin-view hidden" id="view-comments">
         <div class="admin-card">
           <div class="admin-card-header">
@@ -201,7 +195,6 @@
         </div>
       </div>
 
-      <!-- MESSAGGI (CONTACTS) VIEW -->
       <div class="admin-view hidden" id="view-contacts">
         <div class="admin-card">
           <div class="admin-card-header">
@@ -211,18 +204,17 @@
         </div>
       </div>
 
-      <!-- LOGS VIEW -->
       <div class="admin-view hidden" id="view-logs">
         <div class="admin-card">
           <div class="admin-card-header">
-            <h3>Log attività admin</h3>
+            <h3>Log attivita admin</h3>
           </div>
           <table class="admin-table" id="logs-table">
             <thead>
               <tr>
                 <th>Data</th>
                 <th>Azione</th>
-                <th>Entità</th>
+                <th>Entita</th>
                 <th>IP</th>
                 <th>Dettagli</th>
               </tr>
@@ -231,12 +223,11 @@
           </table>
         </div>
       </div>
-
     </main>
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/quill/1.3.7/quill.min.js"></script>
-  <script src="/js/admin.js"></script>
+  <script src="/js/admin.js?v=8"></script>
 </body>
 
 </html>

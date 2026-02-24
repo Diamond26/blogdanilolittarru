@@ -1,22 +1,22 @@
 const express = require('express');
 const router = express.Router();
-const { getPool } = require('../utils/db');
 const { generateFingerprint } = require('../middleware/security');
+const { optionalAuth } = require('../middleware/auth');
 
-// POST /api/likes/:postId â€” Metti/togli like
-router.post('/:postId', async (req, res) => {
-  const postId = parseInt(req.params.postId);
+// POST /api/likes/:postId — Metti/togli like
+router.post('/:postId', optionalAuth, async (req, res) => {
+  const postId = parseInt(req.params.postId, 10);
   if (isNaN(postId)) return res.status(400).json({ error: 'Post non valido.' });
 
   const db = require('../utils/db').getPool();
+  const statusFilter = req.user ? '%' : 'published';
 
   try {
-    const [postRows] = await db.execute('SELECT id FROM posts WHERE id = ? AND status = "published" LIMIT 1', [postId]);
+    const [postRows] = await db.execute('SELECT id FROM posts WHERE id = ? AND status LIKE ? LIMIT 1', [postId, statusFilter]);
     if (postRows.length === 0) return res.status(404).json({ error: 'Articolo non trovato.' });
 
     const fingerprint = generateFingerprint(req);
 
-    // Check if liked
     const [existing] = await db.execute('SELECT id FROM likes WHERE post_id = ? AND fingerprint = ? LIMIT 1', [postId, fingerprint]);
 
     let liked = false;
@@ -36,9 +36,9 @@ router.post('/:postId', async (req, res) => {
   }
 });
 
-// GET /api/likes/:postId/status â€” Stato like corrente utente
+// GET /api/likes/:postId/status — Stato like corrente utente
 router.get('/:postId/status', async (req, res) => {
-  const postId = parseInt(req.params.postId);
+  const postId = parseInt(req.params.postId, 10);
   if (isNaN(postId)) return res.status(400).json({ liked: false, count: 0 });
 
   const fingerprint = generateFingerprint(req);

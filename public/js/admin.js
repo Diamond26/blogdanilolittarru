@@ -10,27 +10,53 @@ function getCsrfToken() {
 }
 
 async function api(path, opts = {}) {
-  const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
-  if (opts.method && opts.method !== 'GET') {
+  const method = (opts.method || 'GET').toUpperCase();
+  const headers = { ...(opts.headers || {}) };
+  if (!headers['Content-Type'] && !headers['content-type']) {
+    headers['Content-Type'] = 'application/json';
+  }
+  if (method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') {
     headers['X-CSRF-Token'] = getCsrfToken();
   }
-  const res = await fetch(`/api${path}`, {
+  const fetchOptions = {
     credentials: 'include',
     headers,
+    cache: 'no-store',
     ...opts,
+  };
+
+  let res = await fetch(`/api${path}`, {
+    ...fetchOptions,
   });
+  if (res.status === 403 && method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') {
+    await fetch('/api/posts?page=1&limit=1', { credentials: 'include' }).catch(() => { });
+    headers['X-CSRF-Token'] = getCsrfToken();
+    res = await fetch(`/api${path}`, {
+      ...fetchOptions,
+      headers,
+    });
+  }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'Errore di rete.');
   return data;
 }
 
 async function apiFormData(path, formData, method = 'POST') {
-  const res = await fetch(`/api${path}`, {
+  let res = await fetch(`/api${path}`, {
     method,
     credentials: 'include',
     body: formData,
     headers: { 'X-CSRF-Token': getCsrfToken() },
   });
+  if (res.status === 403 && method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') {
+    await fetch('/api/posts?page=1&limit=1', { credentials: 'include' }).catch(() => { });
+    res = await fetch(`/api${path}`, {
+      method,
+      credentials: 'include',
+      body: formData,
+      headers: { 'X-CSRF-Token': getCsrfToken() },
+    });
+  }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'Errore di rete.');
   return data;
@@ -57,6 +83,10 @@ let quillEditor = null;
 let editingPostId = null;
 let commentsFilter = 'pending';
 let allCommentsData = [];
+let isEditorInEditMode = false;
+let existingCoverImageUrl = '';
+let youtubePreviewReqId = 0;
+let youtubePreviewDebounce = null;
 
 function initLogin() {
   const form = $('#login-form'), status = $('#login-status'), btn = $('#login-btn');
@@ -88,7 +118,7 @@ function initLogout() {
   });
 }
 
-function switchView(viewName) {
+function switchView(viewName, options = {}) {
   $$('.admin-view').forEach(v => {
     v.classList.remove('active');
     v.classList.add('hidden');
@@ -111,7 +141,12 @@ function switchView(viewName) {
   if (viewName === 'dashboard') loadDashboard();
   else if (viewName === 'posts') loadAllPosts();
   else if (viewName === 'new-post') {
-    if (!editingPostId) initNewPost();
+    if (options.mode === 'edit') {
+      initCoverPreview();
+      if (!quillEditor) initQuill();
+    } else {
+      initNewPost();
+    }
   }
   else if (viewName === 'comments') loadComments();
   else if (viewName === 'contacts') loadContacts();
@@ -168,38 +203,55 @@ async function loadAllPosts() {
         <td>${p.likes || 0}</td>
         <td>${p.comments || 0}${p.pending_comments ? ` <span class="badge badge-pending">${p.pending_comments}</span>` : ''}</td>
         <td><div class="action-btns">
-          <button class="btn btn-sm btn-ghost" onclick="editPost(${p.id})">Modifica</button>
-          <button class="btn btn-sm btn-danger" onclick="deletePost(${p.id},'${escapeAttr(p.title)}')">Elimina</button>
+          <button class="btn btn-sm btn-ghost" data-action="edit-post" data-post-id="${p.id}" type="button">Modifica</button>
+          <button class="btn btn-sm btn-danger" data-action="delete-post" data-post-id="${p.id}" data-post-title="${escapeAttr(p.title)}" type="button">Elimina</button>
         </div></td>
       </tr>`).join('');
   } catch (err) { tbody.innerHTML = `<tr><td colspan="7" style="color:var(--c-error);padding:1rem">${err.message}</td></tr>`; }
 }
 
 function initNewPost() {
+  isEditorInEditMode = false;
+  existingCoverImageUrl = '';
   $('#post-editor-title').textContent = 'Nuovo articolo';
   $('#post-editor-form').reset();
   editingPostId = null;
   $('#edit-post-id').value = '';
+  $('#pe-remove-cover').value = '0';
+  $('#pe-status').value = 'published';
+  $('#pe-youtube-url').value = '';
+  $('#pe-cover').value = '';
   $('#cover-preview').innerHTML = '';
+  resetYouTubePreview();
   if (quillEditor) { quillEditor.setContents([]); } else { initQuill(); }
   initCoverPreview();
+  togglePostTypeUI();
   $('#post-editor-status').classList.add('hidden');
 }
 
 async function editPost(postId) {
+  isEditorInEditMode = true;
   editingPostId = postId;
-  switchView('new-post');
+  switchView('new-post', { mode: 'edit' });
   $('#post-editor-title').textContent = 'Modifica articolo';
   $('#edit-post-id').value = postId;
+  $('#pe-remove-cover').value = '0';
   try {
-    const posts = (await api('/admin/posts')).posts;
-    const post = posts.find(p => p.id === postId); if (!post) return;
-    const { post: fullPost } = await api(`/posts/${post.slug}`);
+    const { post: fullPost } = await api(`/admin/posts/${postId}`);
     $('#pe-title').value = fullPost.title || '';
     $('#pe-type').value = fullPost.type || 'articolo';
     $('#pe-status').value = fullPost.status || 'draft';
     $('#pe-excerpt').value = fullPost.excerpt || '';
-    if (fullPost.cover_image) $('#cover-preview').innerHTML = `<img src="${fullPost.cover_image}" alt="Copertina" />`;
+    $('#pe-youtube-url').value = fullPost.type === 'intervista' ? (fullPost.content || '') : '';
+    existingCoverImageUrl = fullPost.cover_image || '';
+    renderCoverPreview(existingCoverImageUrl, { mode: 'existing' });
+    $('#pe-cover').value = '';
+    togglePostTypeUI();
+    if ((fullPost.type || '') === 'intervista' && fullPost.content) {
+      loadYouTubePreview(fullPost.content, { force: true });
+    } else {
+      resetYouTubePreview();
+    }
     if (!quillEditor) initQuill();
     quillEditor.clipboard.dangerouslyPasteHTML(fullPost.content || '');
   } catch (err) { showStatus($('#post-editor-status'), err.message, 'error'); }
@@ -216,11 +268,70 @@ function initQuill() {
 function initCoverPreview() {
   const input = $('#pe-cover'), preview = $('#cover-preview');
   if (!input || !preview) return;
+  if (input.dataset.previewBound === '1') return;
+  input.dataset.previewBound = '1';
   input.addEventListener('change', () => {
     const file = input.files[0];
-    if (!file) { preview.innerHTML = ''; return; }
-    preview.innerHTML = `<img src="${URL.createObjectURL(file)}" alt="Anteprima" />`;
+    if (!file) {
+      if (isEditorInEditMode && existingCoverImageUrl && $('#pe-remove-cover').value !== '1') {
+        renderCoverPreview(existingCoverImageUrl, { mode: 'existing' });
+      } else {
+        preview.innerHTML = '';
+      }
+      return;
+    }
+    $('#pe-remove-cover').value = '0';
+    renderCoverPreview(URL.createObjectURL(file), { mode: 'selected' });
   });
+}
+
+function togglePostTypeUI() {
+  const type = $('#pe-type')?.value || 'articolo';
+  const isInterview = type === 'intervista';
+
+  $('#pe-youtube-group')?.classList.toggle('hidden', !isInterview);
+  $('#pe-content-group')?.classList.toggle('hidden', isInterview);
+  $('#pe-cover-group')?.classList.toggle('hidden', isInterview);
+  $('#pe-status-group')?.classList.toggle('hidden', isInterview);
+  $('#pe-excerpt-group')?.classList.toggle('hidden', isInterview);
+
+  if (isInterview) {
+    $('#pe-status').value = 'published';
+    const youtubeValue = $('#pe-youtube-url')?.value || '';
+    loadYouTubePreview(youtubeValue, { force: true });
+  } else {
+    resetYouTubePreview();
+  }
+}
+
+function initPostTypeControls() {
+  const typeSelect = $('#pe-type');
+  if (!typeSelect) return;
+  typeSelect.addEventListener('change', togglePostTypeUI);
+  togglePostTypeUI();
+}
+
+function renderCoverPreview(imageUrl, options = {}) {
+  const mode = options.mode || 'selected';
+  const preview = $('#cover-preview');
+  if (!preview) return;
+  if (!imageUrl) {
+    preview.innerHTML = '';
+    return;
+  }
+
+  const removeExisting = mode === 'existing'
+    ? '<button type="button" class="btn btn-sm btn-danger" data-action="remove-cover-image" style="margin-top:.5rem">Rimuovi immagine</button>'
+    : '';
+  const clearSelected = mode === 'selected'
+    ? '<button type="button" class="btn btn-sm btn-ghost" data-action="clear-selected-cover" style="margin-top:.5rem">Annulla selezione</button>'
+    : '';
+
+  preview.innerHTML = `
+    <img src="${imageUrl}" alt="Copertina" />
+    ${removeExisting}
+    ${clearSelected}
+  `;
 }
 
 function initPostEditorForm() {
@@ -235,6 +346,8 @@ function initPostEditorForm() {
     formData.append('status', $('#pe-status').value);
     formData.append('excerpt', $('#pe-excerpt').value);
     formData.append('content', quillEditor ? quillEditor.root.innerHTML : '');
+    formData.append('youtube_url', $('#pe-youtube-url').value.trim());
+    formData.append('remove_cover_image', $('#pe-remove-cover').value || '0');
     const coverFile = $('#pe-cover').files[0];
     if (coverFile) formData.append('cover_image', coverFile);
     try {
@@ -278,8 +391,8 @@ function renderComments() {
       </div>
       <p class="comment-admin-content">${escapeHtml(c.content)}</p>
       <div class="comment-admin-actions" style="margin-top:0.5rem">
-        ${!c.is_approved ? `<button class="btn btn-sm btn-ghost" onclick="approveComment(${c.id})">Approva</button>` : ''}
-        <button class="btn btn-sm btn-danger" onclick="deleteComment(${c.id})">Elimina</button>
+        ${!c.is_approved ? `<button class="btn btn-sm btn-ghost" data-action="approve-comment" data-comment-id="${c.id}" type="button">Approva</button>` : ''}
+        <button class="btn btn-sm btn-danger" data-action="delete-comment" data-comment-id="${c.id}" type="button">Elimina</button>
       </div>
     </div>`).join('');
 }
@@ -320,8 +433,8 @@ async function loadContacts() {
         </div>
         <p class="comment-admin-content" style="white-space:pre-wrap">${escapeHtml(c.message)}</p>
         <div class="comment-admin-actions" style="margin-top:0.5rem">
-          ${!c.is_read ? `<button class="btn btn-sm btn-ghost" onclick="markContactRead(${c.id})">Letto</button>` : ''}
-          <button class="btn btn-sm btn-danger" onclick="deleteContact(${c.id})">Elimina</button>
+          ${!c.is_read ? `<button class="btn btn-sm btn-ghost" data-action="mark-contact-read" data-contact-id="${c.id}" type="button">Letto</button>` : ''}
+          <button class="btn btn-sm btn-danger" data-action="delete-contact" data-contact-id="${c.id}" type="button">Elimina</button>
         </div>
       </div>`).join('');
   } catch (err) { container.innerHTML = `<p style="padding:1rem;color:var(--c-error)">${err.message}</p>`; }
@@ -361,16 +474,190 @@ function escapeHtml(str) {
 }
 function escapeAttr(str) { return escapeHtml(str); }
 
-window.editPost = editPost;
-window.deletePost = deletePost;
-window.approveComment = approveComment;
-window.deleteComment = deleteComment;
-window.markContactRead = markContactRead;
-window.deleteContact = deleteContact;
-window.switchView = switchView;
+function formatDateOnly(dateStr) {
+  if (!dateStr) return '-';
+  return new Date(dateStr).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+function getYouTubeId(url) {
+  if (!url || typeof url !== 'string') return null;
+  const raw = url.trim();
+  if (!raw) return null;
+  try {
+    const parsed = new URL(raw);
+    const host = parsed.hostname.replace(/^www\./, '');
+    if (host === 'youtu.be') {
+      const id = parsed.pathname.replace(/^\/+/, '').split('/')[0];
+      return id && id.length === 11 ? id : null;
+    }
+    if (host.endsWith('youtube.com') || host.endsWith('youtube-nocookie.com')) {
+      const byQuery = parsed.searchParams.get('v');
+      if (byQuery && byQuery.length === 11) return byQuery;
+      const parts = parsed.pathname.split('/').filter(Boolean);
+      const markerIndex = parts.findIndex(p => ['embed', 'v', 'shorts', 'live'].includes(p));
+      if (markerIndex !== -1 && parts[markerIndex + 1] && parts[markerIndex + 1].length === 11) {
+        return parts[markerIndex + 1];
+      }
+    }
+  } catch (_) { }
+  const match = raw.match(/(?:youtu\.be\/|youtube(?:-nocookie)?\.com\/(?:watch\?(?:.*&)?v=|embed\/|v\/|shorts\/|live\/))([A-Za-z0-9_-]{11})/i);
+  return match ? match[1] : null;
+}
+
+function resetYouTubePreview() {
+  const preview = $('#pe-youtube-preview');
+  if (!preview) return;
+  preview.className = 'youtube-preview hidden';
+  preview.innerHTML = '';
+}
+
+function renderYouTubePreviewLoading() {
+  const preview = $('#pe-youtube-preview');
+  if (!preview) return;
+  preview.className = 'youtube-preview is-loading';
+  preview.innerHTML = 'Caricamento anteprima YouTube...';
+}
+
+function renderYouTubePreviewError(message) {
+  const preview = $('#pe-youtube-preview');
+  if (!preview) return;
+  preview.className = 'youtube-preview is-error';
+  preview.textContent = message || 'Impossibile caricare anteprima video.';
+}
+
+function renderYouTubePreview(meta) {
+  const preview = $('#pe-youtube-preview');
+  if (!preview) return;
+
+  const videoId = getYouTubeId(meta?.url || '');
+  if (!videoId) {
+    renderYouTubePreviewError('Link YouTube non valido.');
+    return;
+  }
+
+  const description = (meta.description || '').trim();
+  const shortDescription = description.length > 240 ? `${description.slice(0, 240)}...` : description;
+  const published = meta.published_at ? formatDateOnly(meta.published_at) : '-';
+
+  preview.className = 'youtube-preview';
+  preview.innerHTML = `
+    <div class="youtube-preview-frame">
+      <iframe src="https://www.youtube-nocookie.com/embed/${videoId}?rel=0" title="${escapeAttr(meta.title || 'Anteprima video')}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+    </div>
+    <p class="youtube-preview-title">${escapeHtml(meta.title || 'Video YouTube')}</p>
+    <p class="youtube-preview-meta">Pubblicato: ${escapeHtml(published)}</p>
+    ${shortDescription ? `<p class="youtube-preview-desc">${escapeHtml(shortDescription)}</p>` : ''}
+  `;
+}
+
+async function loadYouTubePreview(url, options = {}) {
+  const isInterview = ($('#pe-type')?.value || 'articolo') === 'intervista';
+  if (!isInterview) {
+    resetYouTubePreview();
+    return;
+  }
+
+  const trimmed = String(url || '').trim();
+  if (!trimmed) {
+    resetYouTubePreview();
+    return;
+  }
+
+  const localVideoId = getYouTubeId(trimmed);
+  if (!localVideoId) {
+    renderYouTubePreviewError('Inserisci un link YouTube valido.');
+    return;
+  }
+
+  const reqId = ++youtubePreviewReqId;
+  renderYouTubePreviewLoading();
+
+  try {
+    const { preview } = await api(`/posts/youtube/preview?url=${encodeURIComponent(trimmed)}`);
+    if (reqId !== youtubePreviewReqId) return;
+    renderYouTubePreview(preview);
+
+    // Keep visible fields synced with metadata while editing interviews.
+    if (preview?.title) $('#pe-title').value = preview.title;
+    if (preview?.description) $('#pe-excerpt').value = preview.description;
+  } catch (err) {
+    if (reqId !== youtubePreviewReqId) return;
+    renderYouTubePreviewError(err.message || 'Errore nel caricamento anteprima.');
+  }
+}
+
+function initYouTubePreviewControl() {
+  const input = $('#pe-youtube-url');
+  if (!input || input.dataset.previewBound === '1') return;
+  input.dataset.previewBound = '1';
+
+  input.addEventListener('input', () => {
+    if (youtubePreviewDebounce) clearTimeout(youtubePreviewDebounce);
+    youtubePreviewDebounce = setTimeout(() => {
+      loadYouTubePreview(input.value);
+    }, 350);
+  });
+
+  input.addEventListener('blur', () => {
+    if (youtubePreviewDebounce) clearTimeout(youtubePreviewDebounce);
+    loadYouTubePreview(input.value);
+  });
+}
+
+function initActionDelegation() {
+  document.addEventListener('click', async (e) => {
+    const trigger = e.target.closest('[data-action]');
+    if (!trigger) return;
+
+    const action = trigger.dataset.action;
+    if (action === 'cancel-edit') {
+      switchView('posts');
+      return;
+    }
+    if (action === 'remove-cover-image') {
+      $('#pe-remove-cover').value = '1';
+      $('#pe-cover').value = '';
+      existingCoverImageUrl = '';
+      renderCoverPreview('', { mode: 'selected' });
+      return;
+    }
+    if (action === 'clear-selected-cover') {
+      $('#pe-cover').value = '';
+      if (isEditorInEditMode && existingCoverImageUrl && $('#pe-remove-cover').value !== '1') {
+        renderCoverPreview(existingCoverImageUrl, { mode: 'existing' });
+      } else {
+        renderCoverPreview('', { mode: 'selected' });
+      }
+      return;
+    }
+    if (action === 'edit-post') {
+      await editPost(Number(trigger.dataset.postId));
+      return;
+    }
+    if (action === 'delete-post') {
+      await deletePost(Number(trigger.dataset.postId), trigger.dataset.postTitle || '');
+      return;
+    }
+    if (action === 'approve-comment') {
+      await approveComment(Number(trigger.dataset.commentId));
+      return;
+    }
+    if (action === 'delete-comment') {
+      await deleteComment(Number(trigger.dataset.commentId));
+      return;
+    }
+    if (action === 'mark-contact-read') {
+      await markContactRead(Number(trigger.dataset.contactId));
+      return;
+    }
+    if (action === 'delete-contact') {
+      await deleteContact(Number(trigger.dataset.contactId));
+    }
+  });
+}
 
 document.addEventListener('DOMContentLoaded', () => {
   initLogin(); initLogout(); initNavigation();
-  initPostEditorForm(); initCommentFilters();
+  initPostEditorForm(); initPostTypeControls(); initYouTubePreviewControl(); initCommentFilters(); initActionDelegation();
   checkAuth();
 });

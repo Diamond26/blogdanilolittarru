@@ -48,24 +48,73 @@ function getCsrfToken() {
 }
 
 function getYouTubeId(url) {
-  if (!url) return null;
-  const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:v\/|u\/\w\/|embed\/|watch\?v=))([^#&?]*)/);
-  return (match && match[1].length === 11) ? match[1] : null;
+  if (!url || typeof url !== 'string') return null;
+  const raw = url.trim();
+  if (!raw) return null;
+
+  try {
+    const parsed = new URL(raw);
+    const host = parsed.hostname.replace(/^www\./, '');
+
+    if (host === 'youtu.be') {
+      const id = parsed.pathname.replace(/^\/+/, '').split('/')[0];
+      return id && id.length === 11 ? id : null;
+    }
+
+    if (host.endsWith('youtube.com') || host.endsWith('youtube-nocookie.com')) {
+      const byQuery = parsed.searchParams.get('v');
+      if (byQuery && byQuery.length === 11) return byQuery;
+
+      const parts = parsed.pathname.split('/').filter(Boolean);
+      const markerIndex = parts.findIndex(p => ['embed', 'v', 'shorts', 'live'].includes(p));
+      if (markerIndex !== -1 && parts[markerIndex + 1] && parts[markerIndex + 1].length === 11) {
+        return parts[markerIndex + 1];
+      }
+    }
+  } catch (_) {
+    // Fallback regex for malformed URL strings.
+  }
+
+  const match = raw.match(/(?:youtu\.be\/|youtube(?:-nocookie)?\.com\/(?:watch\?(?:.*&)?v=|embed\/|v\/|shorts\/|live\/))([A-Za-z0-9_-]{11})/i);
+  return match ? match[1] : null;
+}
+
+function getInterviewCover(post) {
+  if (post.cover_image) return post.cover_image;
+  const videoId = getYouTubeId(post.content);
+  return videoId ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : null;
 }
 
 // ═══════════════════════════════
 // API
 // ═══════════════════════════════
 async function api(path, options = {}) {
-  const headers = { 'Content-Type': 'application/json', ...options.headers };
-  if (options.method && options.method !== 'GET') {
+  const method = (options.method || 'GET').toUpperCase();
+  const headers = { ...(options.headers || {}) };
+  if (!headers['Content-Type'] && !headers['content-type']) {
+    headers['Content-Type'] = 'application/json';
+  }
+  if (method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') {
     headers['X-CSRF-Token'] = getCsrfToken();
   }
-  const res = await fetch(`/api${path}`, {
+  const fetchOptions = {
     credentials: 'include',
     headers,
+    cache: 'no-store',
     ...options,
+  };
+
+  let res = await fetch(`/api${path}`, {
+    ...fetchOptions,
   });
+  if (res.status === 403 && method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') {
+    await fetch('/api/posts?page=1&limit=1', { credentials: 'include' }).catch(() => { });
+    headers['X-CSRF-Token'] = getCsrfToken();
+    res = await fetch(`/api${path}`, {
+      ...fetchOptions,
+      headers,
+    });
+  }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'Errore di rete.');
   return data;
@@ -198,8 +247,9 @@ function renderPostCard(post) {
   });
 
   const imgWrap = el('div', { class: 'post-card-image' });
-  if (post.cover_image) {
-    const img = el('img', { src: post.cover_image, alt: post.title, loading: 'lazy' });
+  const cardImage = post.type === 'intervista' ? getInterviewCover(post) : post.cover_image;
+  if (cardImage) {
+    const img = el('img', { src: cardImage, alt: post.title, loading: 'lazy' });
     imgWrap.appendChild(img);
   } else {
     const ph = el('div', { class: 'post-card-image-placeholder' }, 'DL');
@@ -300,19 +350,28 @@ function renderPostDetail(post, comments, container) {
 
   // Se è un'intervista e ha un link YouTube, mostra il video in cima
   if (post.type === 'intervista') {
-    const videoId = getYouTubeId(post.content);
+    const interviewUrl = (post.content || '').trim();
+    const videoId = getYouTubeId(interviewUrl);
     if (videoId) {
       const videoWrap = el('div', { class: 'video-wrapper', style: 'aspect-ratio:16/9; margin-bottom:2rem; border-radius:12px; overflow:hidden; background:#000;' });
       videoWrap.innerHTML = `<iframe width="100%" height="100%" src="https://www.youtube-nocookie.com/embed/${videoId}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>`;
       frag.appendChild(videoWrap);
+    } else if (interviewUrl) {
+      frag.appendChild(el('a', {
+        class: 'btn btn-primary',
+        href: interviewUrl,
+        target: '_blank',
+        rel: 'noopener noreferrer',
+        style: 'display:inline-flex; margin-bottom:1.25rem;',
+      }, 'Guarda l\'intervista su YouTube'));
     }
+  } else {
+    const contentDiv = el('div', { class: 'post-detail-content prose', html: post.content });
+    frag.appendChild(contentDiv);
   }
 
-  const contentDiv = el('div', { class: 'post-detail-content prose', html: post.content });
-  frag.appendChild(contentDiv);
-
   const likeSection = el('div', { class: 'post-like-section' });
-  const likeBtn = el('button', { class: 'like-btn', 'data-postid': post.id });
+  const likeBtn = el('button', { class: 'like-btn', 'data-postid': post.id, type: 'button' });
   likeBtn.innerHTML = '<span class="like-icon">♡</span> Mi piace';
   const likeCountText = el('span', { class: 'like-count-text' }, pluralize(post.like_count || 0, 'persona', 'persone') + ' ha trovato utile');
   likeSection.appendChild(likeBtn);
@@ -411,6 +470,7 @@ function renderCommentForm(postId) {
 
   const btn = el('button', {
     class: 'btn btn-primary btn-sm',
+    type: 'button',
     onclick: () => submitComment(postId, form, statusEl),
   }, 'Invia commento');
   form.appendChild(btn);

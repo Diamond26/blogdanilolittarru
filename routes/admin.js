@@ -70,6 +70,22 @@ router.get('/posts', async (req, res) => {
   }
 });
 
+// GET /api/admin/posts/:id — Dettaglio post per modifica (senza incrementare visite)
+router.get('/posts/:id', async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) return res.status(400).json({ error: 'ID post non valido.' });
+
+  try {
+    const db = require('../utils/db').getPool();
+    const [posts] = await db.execute('SELECT * FROM posts WHERE id = ? LIMIT 1', [id]);
+    if (!posts.length) return res.status(404).json({ error: 'Articolo non trovato.' });
+    return res.json({ post: posts[0] });
+  } catch (err) {
+    console.error('GET /admin/posts/:id error:', err);
+    return res.status(500).json({ error: 'Errore nel caricamento del post.' });
+  }
+});
+
 // GET /api/admin/comments — Tutti i commenti con stato
 router.get('/comments', async (req, res) => {
   try {
