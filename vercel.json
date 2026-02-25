@@ -3,23 +3,68 @@
   "framework": null,
   "outputDirectory": "public",
   "rewrites": [
-    { "source": "/admin", "destination": "/admin.html" },
-    { "source": "/api/(.*)", "destination": "/api/$1" }
+    {
+      "source": "/admin",
+      "destination": "/admin.html"
+    },
+    {
+      "source": "/api/auth/:path*",
+      "destination": "/api/auth.js"
+    },
+    {
+      "source": "/api/posts/:path*",
+      "destination": "/api/posts.js"
+    },
+    {
+      "source": "/api/comments/:path*",
+      "destination": "/api/comments.js"
+    },
+    {
+      "source": "/api/admin/:path*",
+      "destination": "/api/admin.js"
+    },
+    {
+      "source": "/api/contacts/:path*",
+      "destination": "/api/contacts.js"
+    },
+    {
+      "source": "/api/likes/:path*",
+      "destination": "/api/likes.js"
+    },
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/$1"
+    }
   ],
   "headers": [
     {
       "source": "/admin",
       "headers": [
-        { "key": "X-Robots-Tag", "value": "noindex, nofollow" },
-        { "key": "Cache-Control", "value": "no-store" }
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
       ]
     },
     {
       "source": "/api/(.*)",
       "headers": [
-        { "key": "X-Content-Type-Options", "value": "nosniff" },
-        { "key": "X-Frame-Options", "value": "DENY" },
-        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        }
       ]
     }
   ],
