@@ -1,4 +1,4 @@
-/* app.js — Danilo Littarru SPA Frontend */
+/* app.js — Danilo Littarru SPA Frontend (Vercel Serverless) */
 'use strict';
 
 // ═══════════════════════════════
@@ -42,11 +42,6 @@ function pluralize(n, singular, plural) {
   return `${n} ${n === 1 ? singular : plural}`;
 }
 
-function getCsrfToken() {
-  const match = document.cookie.match(/(?:^|;\s*)csrf-token=([^;]*)/);
-  return match ? decodeURIComponent(match[1]) : '';
-}
-
 function getYouTubeId(url) {
   if (!url || typeof url !== 'string') return null;
   const raw = url.trim();
@@ -71,9 +66,7 @@ function getYouTubeId(url) {
         return parts[markerIndex + 1];
       }
     }
-  } catch (_) {
-    // Fallback regex for malformed URL strings.
-  }
+  } catch (_) { }
 
   const match = raw.match(/(?:youtu\.be\/|youtube(?:-nocookie)?\.com\/(?:watch\?(?:.*&)?v=|embed\/|v\/|shorts\/|live\/))([A-Za-z0-9_-]{11})/i);
   return match ? match[1] : null;
@@ -86,38 +79,29 @@ function getInterviewCover(post) {
 }
 
 // ═══════════════════════════════
-// API
+// API (senza CSRF — protezione via SameSite cookie + CORS)
 // ═══════════════════════════════
 async function api(path, options = {}) {
-  const method = (options.method || 'GET').toUpperCase();
   const headers = { ...(options.headers || {}) };
   if (!headers['Content-Type'] && !headers['content-type']) {
     headers['Content-Type'] = 'application/json';
   }
-  if (method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') {
-    headers['X-CSRF-Token'] = getCsrfToken();
-  }
-  const fetchOptions = {
+  const res = await fetch(`/api${path}`, {
     credentials: 'include',
-    headers,
     cache: 'no-store',
     ...options,
-  };
-
-  let res = await fetch(`/api${path}`, {
-    ...fetchOptions,
+    headers,
   });
-  if (res.status === 403 && method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') {
-    await fetch('/api/posts?page=1&limit=1', { credentials: 'include' }).catch(() => { });
-    headers['X-CSRF-Token'] = getCsrfToken();
-    res = await fetch(`/api${path}`, {
-      ...fetchOptions,
-      headers,
-    });
-  }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'Errore di rete.');
   return data;
+}
+
+// ═══════════════════════════════
+// SITE VISIT TRACKING
+// ═══════════════════════════════
+function trackVisit() {
+  fetch('/api/visits', { method: 'POST', credentials: 'include' }).catch(() => {});
 }
 
 // ═══════════════════════════════
@@ -144,31 +128,20 @@ function initMenu() {
     btn.setAttribute('aria-expanded', String(open));
   });
 
-  // Gestione link con cambio tab (Articoli / Interviste)
   document.addEventListener('click', e => {
     const link = e.target.closest('[data-tab]');
     if (!link) return;
-
-    // Cambia tab nello stato
     state.currentType = link.dataset.tab;
     state.currentPage = 1;
-
-    // Aggiorna UI dei tab nel blog
     $$('.filter-tab').forEach(t => {
       t.classList.toggle('active', t.dataset.type === state.currentType);
     });
-
-    // Chiudi menu mobile se aperto
     if (nav.classList.contains('open')) {
       nav.classList.remove('open');
       btn.classList.remove('open');
       btn.setAttribute('aria-expanded', 'false');
     }
-
-    // Ricarica post
     loadPosts();
-
-    // Scorri alla sezione articoli
     const target = $('#articoli');
     if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
@@ -217,17 +190,13 @@ async function loadPosts() {
     const { posts, pagination: pg } = await api(
       `/posts?type=${state.currentType}&page=${state.currentPage}&limit=9`
     );
-
     loading.classList.add('hidden');
-
     if (!posts || posts.length === 0) {
       empty.classList.remove('hidden');
       return;
     }
-
     posts.forEach(post => grid.appendChild(renderPostCard(post)));
     grid.setAttribute('aria-busy', 'false');
-
     if (pg && pg.pages > 1) {
       renderPagination(pg.page, pg.pages, pagination);
     }
@@ -248,7 +217,7 @@ function renderPostCard(post) {
 
   const imgWrap = el('div', { class: 'post-card-image', style: 'position: relative;' });
   const cardImage = post.type === 'intervista' ? getInterviewCover(post) : post.cover_image;
-  
+
   if (cardImage) {
     const img = el('img', { src: cardImage, alt: post.title, loading: 'lazy' });
     imgWrap.appendChild(img);
@@ -257,7 +226,6 @@ function renderPostCard(post) {
     imgWrap.appendChild(ph);
   }
 
-  // Se è un'intervista, aggiungiamo l'icona Play al centro dell'immagine
   if (post.type === 'intervista') {
     const playIcon = el('div', { class: 'play-icon-overlay' });
     playIcon.innerHTML = '<i class="fa-solid fa-circle-play"></i>';
@@ -267,14 +235,14 @@ function renderPostCard(post) {
   const body = el('div', { class: 'post-card-body' });
   body.appendChild(el('span', { class: 'post-card-type' }, post.type === 'intervista' ? 'Intervista' : 'Articolo'));
   body.appendChild(el('h3', { class: 'post-card-title' }, post.title));
-  
+
   if (post.excerpt) {
     body.appendChild(el('p', { class: 'post-card-excerpt' }, post.excerpt));
   }
 
   const meta = el('div', { class: 'post-card-meta' });
   meta.appendChild(el('span', { class: 'post-card-date' }, formatDate(post.published_at)));
-  
+
   const stats = el('div', { class: 'post-card-stats' });
   stats.appendChild(el('span', { class: 'post-stat' }, `♡ ${post.like_count || 0}`));
   stats.appendChild(el('span', { class: 'post-stat' }, `◎ ${post.comment_count || 0}`));
@@ -358,20 +326,18 @@ function renderPostDetail(post, comments, container) {
     }));
   }
 
-  // Se è un'intervista e ha un link YouTube, mostra il video in cima
   if (post.type === 'intervista') {
     const interviewUrl = (post.content || '').trim();
     const videoId = getYouTubeId(interviewUrl);
-    
+
     if (videoId) {
       const videoWrap = el('div', { class: 'video-wrapper', style: 'aspect-ratio:16/9; margin-bottom:1.5rem; border-radius:12px; overflow:hidden; background:#000;' });
       videoWrap.innerHTML = `<iframe width="100%" height="100%" src="https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>`;
       frag.appendChild(videoWrap);
 
-      // Mostriamo la descrizione del video scaricata da YouTube
       if (post.excerpt) {
         const descDiv = el('div', { class: 'post-detail-content prose' });
-        descDiv.innerHTML = `<p style="white-space: pre-wrap;">${post.excerpt}</p>`; 
+        descDiv.innerHTML = `<p style="white-space: pre-wrap;">${post.excerpt}</p>`;
         frag.appendChild(descDiv);
       }
     }
@@ -617,4 +583,5 @@ document.addEventListener('DOMContentLoaded', () => {
   initContactForm();
   initFooterYear();
   loadPosts();
+  trackVisit();
 });

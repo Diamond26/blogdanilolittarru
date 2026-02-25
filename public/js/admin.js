@@ -1,62 +1,34 @@
-/* admin.js — Pannello Admin Danilo Littarru (BROWSER) */
+/* admin.js — Pannello Admin Danilo Littarru (Vercel Serverless) */
 'use strict';
 
 const $ = (sel, ctx = document) => ctx.querySelector(sel);
 const $$ = (sel, ctx = document) => Array.from(ctx.querySelectorAll(sel));
 
-function getCsrfToken() {
-  const match = document.cookie.match(/(?:^|;\s*)csrf-token=([^;]*)/);
-  return match ? decodeURIComponent(match[1]) : '';
-}
-
+// ═══════════════════════════════
+// API (senza CSRF — protezione via SameSite cookie + CORS)
+// ═══════════════════════════════
 async function api(path, opts = {}) {
-  const method = (opts.method || 'GET').toUpperCase();
   const headers = { ...(opts.headers || {}) };
   if (!headers['Content-Type'] && !headers['content-type']) {
     headers['Content-Type'] = 'application/json';
   }
-  if (method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') {
-    headers['X-CSRF-Token'] = getCsrfToken();
-  }
-  const fetchOptions = {
+  const res = await fetch(`/api${path}`, {
     credentials: 'include',
-    headers,
     cache: 'no-store',
     ...opts,
-  };
-
-  let res = await fetch(`/api${path}`, {
-    ...fetchOptions,
+    headers,
   });
-  if (res.status === 403 && method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') {
-    await fetch('/api/posts?page=1&limit=1', { credentials: 'include' }).catch(() => { });
-    headers['X-CSRF-Token'] = getCsrfToken();
-    res = await fetch(`/api${path}`, {
-      ...fetchOptions,
-      headers,
-    });
-  }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'Errore di rete.');
   return data;
 }
 
 async function apiFormData(path, formData, method = 'POST') {
-  let res = await fetch(`/api${path}`, {
+  const res = await fetch(`/api${path}`, {
     method,
     credentials: 'include',
     body: formData,
-    headers: { 'X-CSRF-Token': getCsrfToken() },
   });
-  if (res.status === 403 && method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') {
-    await fetch('/api/posts?page=1&limit=1', { credentials: 'include' }).catch(() => { });
-    res = await fetch(`/api${path}`, {
-      method,
-      credentials: 'include',
-      body: formData,
-      headers: { 'X-CSRF-Token': getCsrfToken() },
-    });
-  }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'Errore di rete.');
   return data;
@@ -398,7 +370,7 @@ function renderComments() {
 }
 
 async function approveComment(id) {
-  try { await api(`/comments/${id}/approve`, { method: 'PATCH' }); const c = allCommentsData.find(x => x.id === id); if (c) c.is_approved = 1; renderComments(); }
+  try { await api(`/comments/${id}/approve`, { method: 'PATCH' }); const c = allCommentsData.find(x => x.id === id); if (c) c.is_approved = true; renderComments(); }
   catch (err) { alert(err.message); }
 }
 async function deleteComment(id) {
@@ -552,22 +524,13 @@ function renderYouTubePreview(meta) {
 
 async function loadYouTubePreview(url, options = {}) {
   const isInterview = ($('#pe-type')?.value || 'articolo') === 'intervista';
-  if (!isInterview) {
-    resetYouTubePreview();
-    return;
-  }
+  if (!isInterview) { resetYouTubePreview(); return; }
 
   const trimmed = String(url || '').trim();
-  if (!trimmed) {
-    resetYouTubePreview();
-    return;
-  }
+  if (!trimmed) { resetYouTubePreview(); return; }
 
   const localVideoId = getYouTubeId(trimmed);
-  if (!localVideoId) {
-    renderYouTubePreviewError('Inserisci un link YouTube valido.');
-    return;
-  }
+  if (!localVideoId) { renderYouTubePreviewError('Inserisci un link YouTube valido.'); return; }
 
   const reqId = ++youtubePreviewReqId;
   renderYouTubePreviewLoading();
@@ -576,8 +539,6 @@ async function loadYouTubePreview(url, options = {}) {
     const { preview } = await api(`/posts/youtube/preview?url=${encodeURIComponent(trimmed)}`);
     if (reqId !== youtubePreviewReqId) return;
     renderYouTubePreview(preview);
-
-    // Keep visible fields synced with metadata while editing interviews.
     if (preview?.title) $('#pe-title').value = preview.title;
     if (preview?.description) $('#pe-excerpt').value = preview.description;
   } catch (err) {
@@ -610,49 +571,24 @@ function initActionDelegation() {
     if (!trigger) return;
 
     const action = trigger.dataset.action;
-    if (action === 'cancel-edit') {
-      switchView('posts');
-      return;
-    }
+    if (action === 'cancel-edit') { switchView('posts'); return; }
     if (action === 'remove-cover-image') {
-      $('#pe-remove-cover').value = '1';
-      $('#pe-cover').value = '';
-      existingCoverImageUrl = '';
-      renderCoverPreview('', { mode: 'selected' });
-      return;
+      $('#pe-remove-cover').value = '1'; $('#pe-cover').value = ''; existingCoverImageUrl = '';
+      renderCoverPreview('', { mode: 'selected' }); return;
     }
     if (action === 'clear-selected-cover') {
       $('#pe-cover').value = '';
       if (isEditorInEditMode && existingCoverImageUrl && $('#pe-remove-cover').value !== '1') {
         renderCoverPreview(existingCoverImageUrl, { mode: 'existing' });
-      } else {
-        renderCoverPreview('', { mode: 'selected' });
-      }
+      } else { renderCoverPreview('', { mode: 'selected' }); }
       return;
     }
-    if (action === 'edit-post') {
-      await editPost(Number(trigger.dataset.postId));
-      return;
-    }
-    if (action === 'delete-post') {
-      await deletePost(Number(trigger.dataset.postId), trigger.dataset.postTitle || '');
-      return;
-    }
-    if (action === 'approve-comment') {
-      await approveComment(Number(trigger.dataset.commentId));
-      return;
-    }
-    if (action === 'delete-comment') {
-      await deleteComment(Number(trigger.dataset.commentId));
-      return;
-    }
-    if (action === 'mark-contact-read') {
-      await markContactRead(Number(trigger.dataset.contactId));
-      return;
-    }
-    if (action === 'delete-contact') {
-      await deleteContact(Number(trigger.dataset.contactId));
-    }
+    if (action === 'edit-post') { await editPost(Number(trigger.dataset.postId)); return; }
+    if (action === 'delete-post') { await deletePost(Number(trigger.dataset.postId), trigger.dataset.postTitle || ''); return; }
+    if (action === 'approve-comment') { await approveComment(Number(trigger.dataset.commentId)); return; }
+    if (action === 'delete-comment') { await deleteComment(Number(trigger.dataset.commentId)); return; }
+    if (action === 'mark-contact-read') { await markContactRead(Number(trigger.dataset.contactId)); return; }
+    if (action === 'delete-contact') { await deleteContact(Number(trigger.dataset.contactId)); }
   });
 }
 
